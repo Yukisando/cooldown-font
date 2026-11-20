@@ -13,9 +13,7 @@ Fixed changes on top of Comfortaa:
 Axes:
   wght  300-700  weight (Comfortaa's own)
   XHGT  520-600  x-height in units (Comfortaa: 547)
-  UNRL  0-1      unroll: tails tighten in (0) or open out and curl (1); past
-                 Comfortaa the end of each loop spirals a little inside. 0.25 looks
-                 like Comfortaa, default 0.4
+  TAIL  0-1      d and q foot: 0 = Comfortaa (default), 1 = full foot like l
   WOBL  0-1      goofy: every letter tilts its own way, up to WOBBLE_DEG degrees
 Rename the font by changing FAMILY below.
 """
@@ -39,7 +37,7 @@ from fontTools.varLib import instancer
 from fontTools.varLib.featureVars import addFeatureVariations
 
 FAMILY = "Cooldown"
-VERSION = 1.5
+VERSION = 1.3
 DESIGNER = "Nathan de Castro (ColdSnap)"
 VENDOR = "CSNP"
 OUT_NAME = "Cooldown-Lab"
@@ -52,7 +50,7 @@ WOBBLE_DEG = 10          # max tilt per letter at WOBL 1
 FILLET = 35              # radius of the round where two straight edges meet
 BLEND = 50               # how far up a stem a curve melts into it
 CORNER_DEG = 35          # a turn sharper than this counts as a corner
-UNROLL_STEPS = [0, 0.25, 0.5, 0.75, 1]   # masters so ends slide along their curves
+TAIL_STEPS = [0.25, 0.5, 0.75, 1]   # extra masters so the foot grows along its curve
 XH = 547                 # Comfortaa's x-height
 ASC = 781
 
@@ -60,7 +58,7 @@ ASC = 781
 AXES = {
     "wght": ("Weight", 300, 400, 700),
     "XHGT": ("x-height", 520, XH, 600),
-    "UNRL": ("Unroll", 0, 0.4, 1),
+    "TAIL": ("Tail", 0, 0, 1),
     "WOBL": ("Wobble", 0, 0, 1),
 }
 MASTER_WEIGHTS = [300, 400, 700]
@@ -119,213 +117,89 @@ def add_glyph(font, name, glyph, metrics):
     font["hmtx"][name] = metrics
 
 
-# ------------------------------------------------------- stroke letters
-# Comfortaa's round letters are one pen line of constant width: a circle that
-# runs on along its tangent. These letters are redrawn as exactly that, and the
-# Unroll axis morphs the line instead of just sliding its ends:
-#   - loops never butt their two tips together: past Comfortaa the closing end
-#     spirals a little inside the letter and tucks in beside its own start;
-#   - tails change shape: rolled in they curl tighter and shorter, run out they
-#     open up a little and turn slightly further. Everything stays subtle.
-COMF = 0.25            # Unroll value that looks like Comfortaa
-OVERLAP_DEG = 15       # closed loops overlap this much, so there is no seam
-SPIRAL_IN = 0.7        # how far inside the end curls at Unroll 1, in stroke widths
-SPIRAL_EXTRA = 50      # degrees the loop runs on past its own start at Unroll 1
-STROKED = ["o", "a", "b", "d", "p", "q", "l", "uni0237"]
+# ------------------------------------------------------------- d / q feet
+FOOT_SAMPLES = 16
 
 
-def smooth(t):
-    t = min(max(t, 0), 1)
-    return t * t * (3 - 2 * t)
+def stroke_path(x0, y_start, yc, rx, ry):
+    """Dense centreline: straight down to yc, then a quarter ellipse curling right."""
+    pts = [(x0, y_start + (yc - y_start) * i / 60) for i in range(61)]
+    if rx > .5 and ry > .5:
+        pts += [(x0 + rx + rx * math.cos(th), yc + ry * math.sin(th))
+                for th in (math.pi + math.pi / 2 * i / 120 for i in range(1, 121))]
+    return pts
 
 
-class Path:
-    """A pen path built from lines and arcs, sampled densely."""
-    def __init__(self, start):
-        self.pts, self.lens = [start], [0.0]
-
-    def _add(self, p):
-        if math.dist(self.pts[-1], p) < 1e-6:
-            return
-        self.lens.append(self.lens[-1] + math.dist(self.pts[-1], p))
-        self.pts.append(p)
-
-    def line(self, p, n=40):
-        x0, y0 = self.pts[-1]
-        for i in range(1, n + 1):
-            self._add((x0 + (p[0] - x0) * i / n, y0 + (p[1] - y0) * i / n))
-        return self
-
-    def arc(self, c, rx, ry, a0, a1, inward=0.0, tuck_deg=0, tuck_at_start=False):
-        """Elliptic arc from angle a0 to a1 (degrees). With `inward`, the radius
-        shrinks smoothly by that much over `tuck_deg` at the end (or start)."""
-        if rx < .5 or ry < .5 or abs(a1 - a0) < .01:
-            return self
-        n = max(8, int(abs(a1 - a0) / 2))
-        sweep = abs(a1 - a0)
-        for i in range(1, n + 1):
-            a = a0 + (a1 - a0) * i / n
-            done = sweep * i / n
-            k = smooth((tuck_deg - done) / tuck_deg) if tuck_at_start else \
-                smooth((done - (sweep - tuck_deg)) / tuck_deg) if tuck_deg else 0
-            t = math.radians(a)
-            self._add((c[0] + (rx - inward * k) * math.cos(t), c[1] + (ry - inward * k) * math.sin(t)))
-        return self
-
-    @property
-    def length(self):
-        return self.lens[-1]
-
-    def at(self, s):
-        s = min(max(s, 0), self.length)
-        i = min(max(bisect.bisect_left(self.lens, s), 1), len(self.lens) - 1)
-        a, b = self.pts[i - 1], self.pts[i]
-        f = (s - self.lens[i - 1]) / ((self.lens[i] - self.lens[i - 1]) or 1)
-        return (a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f)
-
-    def samples(self, n):
-        """n+1 evenly spaced (point, unit tangent) samples along the whole path."""
-        out, L = [], self.length
-        for k in range(n + 1):
-            s = L * k / n
-            a, b = self.at(max(s - 1, 0)), self.at(min(s + 1, L))
-            d = math.dist(a, b) or 1
-            out.append((self.at(s), ((b[0] - a[0]) / d, (b[1] - a[1]) / d)))
-        return out
-
-
-def round_stroke(samples, w):
-    """Constant-width stroke with a round cap at both ends; the point count only
-    depends on the number of samples, so every master stays compatible."""
+def round_stroke(path, w, n=FOOT_SAMPLES):
+    """Round-ended stroke along `path`, always the same number of points,
+    drawn with off-curve points so the sides stay smooth curves."""
+    lens = [0]
+    for a, b in zip(path, path[1:]):
+        lens.append(lens[-1] + math.dist(a, b))
+    samples = []
+    for k in range(n + 1):
+        s = lens[-1] * k / n
+        i = min(max(bisect.bisect_left(lens, s), 1), len(lens) - 1)
+        a, b = path[i - 1], path[i]
+        seg = (lens[i] - lens[i - 1]) or 1
+        f = (s - lens[i - 1]) / seg
+        samples.append(((a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f),
+                        ((b[0] - a[0]) / seg, (b[1] - a[1]) / seg)))
     r = w / 2
     left = [(x - ty * r, y + tx * r) for (x, y), (tx, ty) in samples]
     right = [(x + ty * r, y - tx * r) for (x, y), (tx, ty) in samples]
     (ex, ey), (tx, ty) = samples[-1]
-    (sx, sy), (ux, uy) = samples[0]
-    a_end, a_start = math.atan2(tx, -ty), math.atan2(-ux, uy)
+    a = math.atan2(tx, -ty)
     pts = [(left[0], True)] + [(p, False) for p in left[1:-1]] + [(left[-1], True)]
-    pts += arc(ex, ey, r, a_end, a_end - math.pi)
+    pts += arc(ex, ey, r, a, a - math.pi)
     pts += [(p, False) for p in reversed(right[1:-1])] + [(right[0], True)]
-    pts += arc(sx, sy, r, a_start, a_start - math.pi)[:-1]
     return [p for p, _ in pts], [o for _, o in pts]
 
 
-def stroke_letters(font, u):
-    """Redraw STROKED letters as pen strokes for Unroll value u (0-1)."""
+def add_foot(font, base, stem_zone, drop, tail):
+    """Grow a rounded foot out of the stem of `base`, shaped like Comfortaa's l.
+    The stroke really grows: at 0 it hides inside the letter, then it gets longer
+    and curls to the right, ending on a round cap at every value."""
     glyf, hmtx = font["glyf"], font["hmtx"]
-    for n in STROKED + ["I"]:
-        glyf[n].recalcBounds(glyf)
-    # s: -1 (rolled in) .. 0 (Comfortaa) .. 1 (run out)
-    s = (u - COMF) / COMF if u < COMF else (u - COMF) / (1 - COMF)
-    out, inn = max(s, 0), max(-s, 0)
-    w = glyf["I"].xMax - glyf["I"].xMin
-    o = glyf["o"]
-    R = (o.xMax - o.xMin) / 2 - w / 2
-    cy = (o.yMin + o.yMax) / 2
-    # The pen closes the circle, covers its own start, and only then curls inward:
-    # a little spiral, with no step and no tips butting into each other.
-    tuck = SPIRAL_IN * w * smooth(out)
-    sweep = 360 + OVERLAP_DEG + SPIRAL_EXTRA * smooth(out)
-    tuck_deg = sweep - 360 + 10
-    shapes = {}
-
-    def loop(c, a0, direction):
-        """A circle from a0 (direction -1 = clockwise) whose end tucks inside."""
-        return Path((c[0] + R * math.cos(math.radians(a0)), c[1] + R * math.sin(math.radians(a0)))) \
-            .arc(c, R, R, a0, a0 + direction * sweep, inward=tuck, tuck_deg=tuck_deg)
-
-    # o
-    cx = (o.xMin + o.xMax) / 2
-    shapes["o"] = [(loop((cx, cy), 60, -1), 56)]
-
-    # a: the loop runs on down its right tangent; here the loop's *start* tucks in,
-    # so the tail that makes it an a always stays
-    a = glyf["a"]
-    sx = a.xMax - w / 2
-    acx = sx - R
-    a0 = sweep - 360                                  # the loop starts inside, past the join
-    ra = R - tuck
-    p = Path((acx + ra * math.cos(math.radians(a0)), cy + ra * math.sin(math.radians(a0))))
-    p.arc((acx, cy), R, R, a0, -360, inward=tuck, tuck_deg=tuck_deg, tuck_at_start=True)
-    rc = 35 * out                                     # little curl that grows at the foot
-    p.line((sx, w / 2 + rc + 18 * inn))
-    p.arc((sx + rc, w / 2 + rc), rc, rc, 180, 270 + 25 * out)
-    shapes["a"] = [(p, 72)]
-
-    # d / q and b / p: stem + loop. The stem's free end morphs, the loop tucks in.
-    for name, right, down in (("d", True, False), ("q", True, True),
-                              ("b", False, False), ("p", False, True)):
-        g = glyf[name]
-        sx = g.xMax - w / 2 if right else g.xMin + w / 2
-        c = (sx - R if right else sx + R, cy)
-        side = 1 if right else -1
-        if not down:          # ascender letters: stem from the top down to the join
-            stem = Path((sx, g.yMax - w / 2)).line((sx, cy))
-            extra = 60 * out                       # runs on a little below the join
-            if extra > .5:
-                if right:     # d: curves gently right as it runs out
-                    rc = 30 * out
-                    stem.line((sx, cy - extra))
-                    stem.arc((sx + rc, cy - extra), rc, rc, 180, 180 + 55 * out)
-                else:         # b: just a short straight run
-                    stem.line((sx, cy - extra))
-            lp = loop(c, 0 if right else 180, -1 if right else 1)
-        else:                 # descender letters: stem from the join down
-            top = cy + (60 * out if not right else 0)   # p's stem peeks above the join
-            bottom = g.yMin + w / 2
-            stem = Path((sx, top)).line((sx, cy)) if top > cy + .5 else Path((sx, cy))
-            if right:         # q: the descender's end curls right a little
-                rc = 35 * out
-                stem.line((sx, bottom + rc + 22 * inn))
-                stem.arc((sx + rc, bottom + rc), rc, rc, 180, 270 + 25 * out)
-            else:
-                stem.line((sx, bottom + 22 * inn))
-            lp = loop(c, 0 if right else 180, 1 if right else -1)
-        shapes[name] = [(stem, 28), (lp, 56)]
-
-    # l: Comfortaa's stem and foot; the foot tightens when rolled in, opens when run out
     l = glyf["l"]
     lpts = list(l.coordinates)
-    stem_pts = [q for q in lpts if q[1] > 300]
-    lx0, lx1 = min(q[0] for q in stem_pts), max(q[0] for q in stem_pts)
-    sx = (lx0 + lx1) / 2
-    curve_y = min(q[1] for q in lpts if q[0] == lx0)
-    rx, ry = (l.xMax - w / 2) - sx, curve_y - (l.yMin + w / 2)
-    f = 1 + .12 * out - .3 * inn
-    rx, ry = rx * f, ry * f
-    base = l.yMin + w / 2
-    p = Path((sx, l.yMax - w / 2)).line((sx, base + ry))
-    p.arc((sx + rx, base + ry), rx, ry, 180, 270 + 20 * out - 25 * inn)
-    shapes["l"] = [(p, 36)]
+    lstem = [p for p in lpts if p[1] > 300]
+    lx0, lx1 = min(p[0] for p in lstem), max(p[0] for p in lstem)
+    lc, lr = (lx0 + lx1) / 2, (lx1 - lx0) / 2
+    l_curve_y = min(p[1] for p in lpts if p[0] == lx0)
+    l_xmax, l_ymin = max(p[0] for p in lpts), min(p[1] for p in lpts)
+    l_rsb = hmtx["l"][0] - l_xmax
+    rx, ry = (l_xmax - lr) - lc, l_curve_y - (l_ymin + lr)    # l's foot, centreline radii
 
-    # dotless j: stem and hook to the left, same idea mirrored
-    j = glyf["uni0237"]
-    jpts = list(j.coordinates)
-    jstem = [q for q in jpts if q[1] > 100]
-    jx0, jx1 = min(q[0] for q in jstem), max(q[0] for q in jstem)
-    sx = (jx0 + jx1) / 2
-    hook_y = min(q[1] for q in jpts if q[0] == jx1)
-    ex_, ey_ = j.xMin + w / 2, j.yMin + w / 2
-    rx, ry = (sx - ex_) * (1 + .12 * out - .3 * inn), (hook_y - ey_) * (1 + .12 * out - .3 * inn)
-    p = Path((sx, j.yMax - w / 2)).line((sx, ey_ + ry))
-    p.arc((sx - rx, ey_ + ry), rx, ry, 0, -90 - 20 * out + 25 * inn)
-    shapes["uni0237"] = [(p, 36)]
+    g = glyf[base]
+    bpts = list(g.coordinates)
+    bstem = [p for p in bpts if stem_zone(p[1])]
+    bx0, bx1 = min(p[0] for p in bstem), max(p[0] for p in bstem)
+    w, bc = bx1 - bx0, (bx0 + bx1) / 2
 
-    for name, strokes in shapes.items():
-        old = glyf[name]
-        old_rsb = hmtx[name][0] - old.xMax
-        g = empty_glyph()
-        for path, n in strokes:
-            append_contour(g, *round_stroke(path.samples(n), w))
-        glyf[name] = g
-        g.recalcBounds(glyf)
-        new_adv = max(hmtx[name][0], round(g.xMax + old_rsb))
-        delta = new_adv - hmtx[name][0]
-        hmtx[name] = (new_adv, hmtx[name][1])
-        for other in font.getGlyphOrder():
-            c = glyf[other]
-            if delta and c.isComposite() and c.components[0].glyphName == name:
-                hmtx[other] = (hmtx[other][0] + delta, hmtx[other][1])
+    if drop:   # q: the descender bends right at its bottom
+        b_bottom = min(p[1] for p in bpts)
+        yb = b_bottom + w / 2
+        lift = ry * tail                       # q's own round end hides inside the curl
+        cap_y = b_bottom + w / 2 + 1
+        g.coordinates = GlyphCoordinates(
+            [(x, y + lift) if y <= cap_y else (x, y) for x, y in bpts])
+        y_start = 150
+    else:      # d: a stem grows down out of the bowl and curls right on the baseline
+        yb = 250 + ((l_ymin + lr) - 250) * tail
+        y_start = 600
+    path = stroke_path(bc, y_start, yb + ry * tail, rx * tail, ry * tail)
+    foot, oncurve = round_stroke(path, w)
+    append_contour(g, foot, oncurve)
+
+    old_adv = hmtx[base][0]
+    new_adv = max(old_adv, round(bc + rx * tail + w / 2 + l_rsb)) if tail else old_adv
+    delta = new_adv - old_adv
+    hmtx[base] = (new_adv, hmtx[base][1])
+    for name in font.getGlyphOrder():
+        c = glyf[name]
+        if c.isComposite() and c.components[0].glyphName == base:
+            hmtx[name] = (hmtx[name][0] + delta, hmtx[name][1])
 
 
 # --------------------------------------------------------------- snowflake
@@ -523,16 +397,15 @@ def find_corners(font):
                 a2 = math.atan2(q[1] - v[1], q[0] - v[0])
                 turn = abs((math.degrees(a2 - a1) + 180) % 360 - 180)
                 if turn > CORNER_DEG and math.dist(p, v) > 2 and math.dist(q, v) > 2:
-                    cross = (v[0] - p[0]) * (q[1] - v[1]) - (v[1] - p[1]) * (q[0] - v[0])
-                    out.append((n, i, cross < 0))
+                    out.append((n, i))
     return out
 
 
 def round_corners(font, corners):
     """Swap each corner point for a small curve (on, off, on): no spikes, no sharp notches."""
     glyf, by = font["glyf"], {}
-    for n, i, tip in corners:
-        by.setdefault(n, {})[i] = tip
+    for n, i in corners:
+        by.setdefault(n, []).append(i)
     for n, idxs in by.items():
         g = glyf[n]
         pts, flags, ends = list(g.coordinates), list(g.flags), list(g.endPtsOfContours)
@@ -546,17 +419,14 @@ def round_corners(font, corners):
             def toward(t, r):
                 d = math.dist(t, v) or 1
                 return (round(v[0] + (t[0] - v[0]) * r / d), round(v[1] + (t[1] - v[1]) * r / d))
-            if idxs[i]:                # outward corner (a tip): small round, never a cut
-                r = min(FILLET, .45 * math.dist(p, v), .45 * math.dist(q, v))
-                new, fl = [toward(p, r), v, toward(q, r)], [1, 0, 1]
-            elif p_curve and q_curve:    # two curves meet in a notch: let them flow together
+            if p_curve and q_curve:      # two curves meet: let them flow into each other
                 flags[i] = 0
                 continue
-            elif p_curve or q_curve:     # a curve meets a straight stem: blend it in wide
+            if p_curve or q_curve:       # a curve meets a straight stem: blend it in wide
                 line = q if p_curve else p
                 b = toward(line, min(BLEND, .5 * math.dist(line, v)))
                 new, fl = ([v, b], [0, 1]) if p_curve else ([b, v], [1, 0])
-            else:                        # two straight lines in a notch: small round
+            else:                        # two straight lines: small round corner
                 r = min(FILLET, .45 * math.dist(p, v), .45 * math.dist(q, v))
                 new, fl = [toward(p, r), v, toward(q, r)], [1, 0, 1]
             pts[i:i + 1] = new
@@ -641,7 +511,7 @@ def source_without_featvars():
     return font, swaps
 
 
-def prepared(wght, unroll=0.4):
+def prepared(wght, tail=1):
     font = instancer.instantiateVariableFont(source_without_featvars()[0], {"wght": wght})
     for tag in ("prep", "fpgm", "cvt "):
         if tag in font:
@@ -650,14 +520,15 @@ def prepared(wght, unroll=0.4):
         if hasattr(g, "program"):
             g.program = ttProgram.Program()
             g.program.fromBytecode(b"")
-    stroke_letters(font, unroll)
+    add_foot(font, "d", lambda y: y > 600, drop=False, tail=tail)
+    add_foot(font, "q", lambda y: y < -100, drop=True, tail=tail)
     add_snowflake(font)
     return font
 
 
 def make_master(loc, dots, corners=None):
     v = {t: a[2] for t, a in AXES.items()} | loc
-    font = prepared(v["wght"], v["UNRL"])
+    font = prepared(v["wght"], v["TAIL"])
     if v["XHGT"] != XH:
         raise_xheight(font, v["XHGT"] - XH)
     add_sparkle_feature(font, dots)
@@ -723,7 +594,7 @@ def main():
     for tag, (_, lo, df, hi) in AXES.items():
         if tag == "wght":
             continue
-        for ext in (UNROLL_STEPS if tag == "UNRL" else (lo, hi)):
+        for ext in (TAIL_STEPS if tag == "TAIL" else (lo, hi)):
             if ext != df:
                 locs += [{"wght": w, tag: ext} for w in MASTER_WEIGHTS]
     for i, loc in enumerate(locs):
