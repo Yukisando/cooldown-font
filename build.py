@@ -36,7 +36,7 @@ from fontTools.varLib import build as varlib_build
 from fontTools.varLib import instancer
 from fontTools.varLib.featureVars import addFeatureVariations
 
-FAMILY = "Cooldown"
+FAMILY = "Cooldown Sans"
 VERSION = 1.7
 DESIGNER = "Nathan de Castro (ColdSnap)"
 VENDOR = "CSNP"

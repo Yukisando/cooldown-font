@@ -1,4 +1,4 @@
-# Cooldown
+# Cooldown Sans
 
 ColdSnap's own typeface. A variable font built on Comfortaa, made easier to read
 for kids and dyslexic readers, with a little frost on top.
@@ -39,12 +39,12 @@ Comfortaa's round, friendly shapes, and fixes the parts that make readers stumbl
 
 ```css
 @font-face {
-  font-family: "Cooldown";
+  font-family: "Cooldown Sans";
   src: url("Cooldown-Lab.woff2") format("woff2");
   font-weight: 300 700;
   font-display: swap;
 }
-body  { font-family: "Cooldown", sans-serif; }
+body  { font-family: "Cooldown Sans", sans-serif; }
 h1    { font-feature-settings: "ss02" 1; }
 ```
 
