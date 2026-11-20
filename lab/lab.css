@@ -1,0 +1,171 @@
+/* Cooldown Sans playground: this repo's lab page, same as coldsnap.fr/lab/cooldown/ and its project
+   viewer (iframe). No inline styles or scripts: the site CSP forbids them. */
+@font-face {
+  font-family: 'Cooldown Sans';
+  src: url('../fonts/Cooldown-Lab.woff2') format('woff2');
+  font-weight: 300 700;
+  font-display: block;
+}
+
+:root {
+  --bg: #11151d;
+  --panel: #182030;
+  --line: rgba(255, 255, 255, 0.1);
+  --text: #f4f1ea;
+  --muted: rgba(244, 241, 234, 0.62);
+  --orange: #F5841A;
+  --on-orange: #1a0e05;
+  --ice: #7fd0ec;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+
+html, body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Cooldown Sans', 'Segoe UI', system-ui, sans-serif;
+}
+
+.lab {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 100vh;
+  padding: 18px 18px 14px;
+  max-width: 980px;
+  margin: 0 auto;
+}
+
+.lab__sample {
+  font-size: clamp(2.4rem, 9vw, 4.6rem);
+  line-height: 1.08;
+  outline: none;
+  padding: 4px 6px;
+  border-radius: 10px;
+  word-break: break-word;
+}
+
+.lab__sample:focus { box-shadow: 0 0 0 2px var(--line); }
+.lab__pairs { color: var(--orange); }
+
+.lab__presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.lab__preset {
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--text);
+  background: transparent;
+  border: 1.5px solid var(--line);
+  border-radius: 999px;
+  padding: 5px 12px;
+  cursor: pointer;
+}
+
+.lab__preset:hover { border-color: var(--muted); }
+
+.lab__preset[aria-pressed="true"] {
+  background: var(--orange);
+  border-color: var(--orange);
+  color: var(--on-orange);
+}
+
+.lab__controls {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px 22px;
+  padding: 4px 2px;
+}
+
+.lab__slider {
+  display: grid;
+  grid-template-columns: 1fr;
+  align-items: center;
+  gap: 2px 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.lab__slider input {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  width: 100%;
+  accent-color: var(--orange);
+}
+
+.lab__toggles {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  font-size: 0.85rem;
+}
+
+.lab__switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+/* On/off switches, never checkboxes (Nathan's rule): a pill track with a sliding knob. */
+.lab__switch input {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  flex: none;
+  width: 34px;
+  height: 20px;
+  margin: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.lab__switch input::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--text);
+  transition: transform 0.2s cubic-bezier(0.3, 0, 0.2, 1);
+}
+
+.lab__switch input:checked { background: var(--orange); }
+.lab__switch input:checked::after { transform: translateX(14px); background: var(--on-orange); }
+.lab__switch input:focus-visible { outline: 2px solid var(--ice); outline-offset: 2px; }
+
+
+
+.lab__css {
+  margin: auto 0 0;
+  font: 0.72rem/1.5 ui-monospace, Consolas, monospace;
+  color: var(--muted);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* Inside the coldsnap.fr project viewer */
+.is-embed .lab { gap: 8px; padding: 12px 14px; min-height: 0; }
+.is-embed .lab__sample { font-size: clamp(2.2rem, 8vw, 3.6rem); }
+.is-embed .lab__controls { grid-template-columns: 1fr; gap: 8px; padding: 2px; }
+.is-embed .lab__slider { grid-template-columns: 9.5em 1fr; }
+.is-embed .lab__slider input { grid-column: 2; grid-row: 1; }
+.is-embed .lab__css { display: none; }
+
+@media (max-width: 560px) {
+  .lab { padding: 12px; }
+  .lab__controls { grid-template-columns: 1fr; }
+}
+
+

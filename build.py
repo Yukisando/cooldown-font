@@ -8,7 +8,7 @@ Writes fonts/Cooldown-Lab.ttf and .woff2
 Fixed changes on top of Comfortaa:
   - more letter and word spacing (easier for dyslexic readers)
   - a snowflake glyph on U+2744 / U+2745 / U+2746
-  - ss02: i/j tittles and punctuation dots become ice sparkles (on/off)
+  - ss02: i/j tittles and punctuation dots become little snowflakes (on/off)
   - ss03: d and q end in a rounded foot like the l (on/off, off by default)
 
 Axes:
@@ -44,8 +44,8 @@ OUT_NAME = "Cooldown-Lab"
 
 SPACING = 6              # extra units on each side of every glyph (UPM 1000)
 WORD_SPACING = 20        # extra units on the space on top of that
-SPARKLE_N = 0.65         # superellipse exponent: 1 = diamond, < 1 = concave star
-SPARKLE_K = 1.45         # how far the sparkle points reach, in dot radii
+FLAKE_REACH = 1.6        # snowflake arm length, in dot radii (ss02)
+FLAKE_STROKE = 0.42      # snowflake stroke width, in dot radii
 WOBBLE_DEG = 10          # max tilt per letter at WOBL 1
 FILLET = 35              # radius of the round where two straight edges meet
 BLEND = 50               # how far up a stem a curve melts into it
@@ -281,7 +281,7 @@ def raise_xheight(font, d):
                 c.y += d
 
 
-# --------------------------------------------------------- sparkles (ss02)
+# ----------------------------------------------------- snowflake dots (ss02)
 def find_dots(font):
     glyf, dots = font["glyf"], []
     for name in font.getGlyphOrder():
@@ -306,22 +306,38 @@ def find_dots(font):
     return dots
 
 
-def sparkle(g, idx):
-    s, e = list(ranges(g))[idx]
-    pts = list(g.coordinates)
-    c = pts[s:e + 1]
-    xs, ys = [p[0] for p in c], [p[1] for p in c]
-    cx, cy = (min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2
-    r = (max(xs) - min(xs) + max(ys) - min(ys)) / 4
-    for i in range(s, e + 1):
-        t = math.atan2(pts[i][1] - cy, pts[i][0] - cx)
-        ca, sa = abs(math.cos(t)), abs(math.sin(t))
-        rr = r * SPARKLE_K / (ca ** SPARKLE_N + sa ** SPARKLE_N) ** (1 / SPARKLE_N)
-        pts[i] = (round(cx + rr * math.cos(t)), round(cy + rr * math.sin(t)))
-    g.coordinates = GlyphCoordinates(pts)
+def flake(g, idxs):
+    """Swap the round dot contours `idxs` of glyph g for little six-armed snowflakes,
+    the same size as the dot (arms and branches are round-capped strokes)."""
+    pts, flags = list(g.coordinates), list(g.flags)
+    spans = list(ranges(g))
+    centres = []
+    for idx in idxs:
+        s, e = spans[idx]
+        xs, ys = [p[0] for p in pts[s:e + 1]], [p[1] for p in pts[s:e + 1]]
+        centres.append(((min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2,
+                        (max(xs) - min(xs) + max(ys) - min(ys)) / 4))
+    keep = [k for k in range(len(spans)) if k not in idxs]
+    g.coordinates = GlyphCoordinates([pts[i] for k in keep for i in range(spans[k][0], spans[k][1] + 1)])
+    g.flags = bytearray(flags[i] for k in keep for i in range(spans[k][0], spans[k][1] + 1))
+    ends, n = [], 0
+    for k in keep:
+        n += spans[k][1] - spans[k][0] + 1
+        ends.append(n - 1)
+    g.endPtsOfContours = ends
+    g.numberOfContours = len(ends)
+    for cx, cy, r in centres:
+        arm, w = r * FLAKE_REACH, max(14, r * FLAKE_STROKE)
+        for k in range(6):
+            a = math.radians(90 + 60 * k)
+            append_contour(g, *capsule((cx, cy), (cx + arm * math.cos(a), cy + arm * math.sin(a)), w))
+            bx, by = cx + arm * .55 * math.cos(a), cy + arm * .55 * math.sin(a)
+            for side in (-1, 1):
+                t = a + side * math.radians(50)
+                append_contour(g, *capsule((bx, by), (bx + arm * .38 * math.cos(t), by + arm * .38 * math.sin(t)), w))
 
 
-def add_sparkle_feature(font, dots):
+def add_flake_feature(font, dots):
     glyf, hmtx = font["glyf"], font["hmtx"]
     by_glyph = {}
     for n, i in dots:
@@ -344,8 +360,7 @@ def add_sparkle_feature(font, dots):
                 if c.glyphName in targets:
                     c.glyphName += ".ss02"
         else:
-            for i in by_glyph[n]:
-                sparkle(new, i)
+            flake(new, by_glyph[n])
         add_glyph(font, n + ".ss02", new, hmtx[n])
         if n in gdef:
             gdef[n + ".ss02"] = gdef[n]
@@ -577,7 +592,7 @@ def make_master(loc, dots, corners=None):
     font = prepared(v["wght"])
     if v["XHGT"] != XH:
         raise_xheight(font, v["XHGT"] - XH)
-    add_sparkle_feature(font, dots)
+    add_flake_feature(font, dots)
     decompose_all(font)
     add_air(font)
     if corners is None:          # first pass: only used to find the corners
@@ -602,7 +617,7 @@ def wght_map(src):
 
 def set_names(vf):
     name = vf["name"]
-    copyright_ = name.getDebugName(0) + f" Copyright 2026 {DESIGNER}."
+    copyright_ = name.getDebugName(0) + f' Copyright 2026 {DESIGNER}, with Reserved Font Name "{FAMILY}".'
     for rec in list(name.names):
         if rec.nameID in (1, 2, 3, 4, 6, 16, 17, 25) or (
                 rec.nameID in (8, 9, 10, 11, 12) and "omfortaa" in rec.toUnicode()):

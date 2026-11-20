@@ -1,174 +1,31 @@
 <!doctype html>
-<html lang="en">
+<html lang="fr">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Cooldown lab</title>
-<style>
-  @font-face { font-family: "Cooldown"; src: url("fonts/Cooldown-Lab.woff2?v=1.7") format("woff2");
-               font-weight: 300 700; font-display: block; }
-  @font-face { font-family: "Comfortaa Ref"; src: url("src/Comfortaa-VariableFont_wght.ttf");
-               font-weight: 300 700; }
-  :root { --ink: #1d2b3a; --soft: #5b6b7b; --ice: #2f7fc4; --bg: #f6f9fc; --card: #fff; --line: #dde7f0; }
-  :root[data-theme="dark"] { --ink: #e8f0f8; --soft: #9fb0c2; --ice: #7fbfff; --bg: #0f1822; --card: #172331; --line: #26364a; }
-  * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--ink); font-family: "Cooldown", sans-serif;
-         font-variation-settings: "wght" 400; }
-  .wrap { display: grid; grid-template-columns: 320px 1fr; min-height: 100vh; }
-  aside { background: var(--card); border-right: 2px solid var(--line); padding: 18px 16px;
-          position: sticky; top: 0; height: 100vh; overflow-y: auto; }
-  main { padding: 24px 28px 80px; min-width: 0; }
-  h1 { margin: 0 0 2px; font-size: 34px; }
-  h1 span { color: var(--ice); }
-  .sub { margin: 0 0 16px; font-size: 13px; color: var(--soft); }
-  .ax { margin: 0 0 14px; }
-  .ax label { display: flex; justify-content: space-between; align-items: baseline; font-size: 15px;
-              font-variation-settings: "wght" 600; }
-  .ax output { font-variation-settings: "wght" 400; color: var(--ice); }
-  .ax input { width: 100%; accent-color: var(--ice); }
-  .ax p { margin: 2px 0 0; font-size: 12px; color: var(--soft); line-height: 1.35; }
-  .ax button { border: 0; background: none; color: var(--soft); font: inherit; font-size: 12px;
-               cursor: pointer; padding: 0 0 0 6px; text-decoration: underline; }
-  .toggles { display: grid; gap: 6px; margin: 16px 0; font-size: 14px; }
-  .presets { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 16px; }
-  .presets button { font: inherit; font-size: 13px; border: 2px solid var(--line); background: var(--bg);
-                    color: var(--ink); border-radius: 10px; padding: 4px 10px; cursor: pointer; }
-  .presets button:hover { border-color: var(--ice); }
-  pre { font-size: 11px; background: var(--bg); border: 2px solid var(--line); border-radius: 10px;
-        padding: 8px; white-space: pre-wrap; word-break: break-all; color: var(--soft); margin: 0; }
-  h2 { font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--ice); margin: 30px 0 8px; }
-  .cd { font-family: "Cooldown"; }
-  .ref { font-family: "Comfortaa Ref"; color: var(--soft); }
-  .hero { font-size: clamp(56px, 9vw, 120px); line-height: 1.05; outline: none; }
-  .read { font-size: var(--size, 24px); line-height: 1.6; max-width: 46em; outline: none; }
-  .ref.read, .ref.hero { display: none; }
-  body.compare .ref.read, body.compare .ref.hero { display: block; }
-  .tag { font-size: 11px; color: var(--soft); margin-top: 8px; }
-  [contenteditable]:focus { box-shadow: 0 0 0 2px var(--line); border-radius: 6px; }
-  @media (max-width: 760px) {
-    .wrap { grid-template-columns: 1fr; }
-    aside { position: static; height: auto; border-right: 0; border-bottom: 2px solid var(--line); }
-    main { padding: 16px; }
-  }
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cooldown Sans, la police de ColdSnap</title>
+  <meta name="description" content="Cooldown Sans, la police de ColdSnap : pensée pour les lecteurs dyslexiques et malvoyants, réglable en direct.">
+  
+  <link rel="preload" href="fonts/Cooldown-Lab.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="lab/lab.css">
+  <script src="lab/lab.js" defer></script>
 </head>
 <body>
-<div class="wrap">
-  <aside>
-    <h1>Cooldown <span>❄</span></h1>
-    <p class="sub">Spacing is built in (+6 per side). Double-click a slider to reset it.</p>
+  <main class="lab">
+    <div class="lab__sample" id="sample" contenteditable="true" spellcheck="false">Cooldown Sans<br><span class="lab__pairs">bdpq ij !</span></div>
 
-    <div class="presets">
-      <button data-p="comfortaa">Like Comfortaa</button>
-      <button data-p="default">Cooldown default</button>
-      <button data-p="reading">Easy reading</button>
-      <button data-p="title">Title</button>
+    <div class="lab__presets" id="presets"></div>
+
+    <div class="lab__controls">
+      <label class="lab__slider"><span data-t="weight">Graisse</span><input type="range" id="wght" min="300" max="700" step="any" value="400"></label>
+      <label class="lab__slider"><span data-t="xheight">Hauteur des minuscules</span><input type="range" id="xhgt" min="470" max="600" step="any" value="547"></label>
+      <label class="lab__slider"><span data-t="wobble">Bancal</span><input type="range" id="wobl" min="0" max="1" step="any" value="0"></label>
+      <div class="lab__toggles">
+        <label class="lab__switch"><input type="checkbox" role="switch" id="tail"><span data-t="tail">Queues sur d et q</span></label>
+        <label class="lab__switch"><input type="checkbox" role="switch" id="spark"><span data-t="spark">Points en flocon</span></label>
+      </div>
     </div>
-
-    <div id="axes"></div>
-
-    <div class="ax"><label>Text size <output id="sizeo">24px</output></label>
-      <input id="size" type="range" min="12" max="56" value="24"></div>
-
-    <div class="toggles">
-      <label><input type="checkbox" id="tail"> Tail on d and q (ss03)</label>
-      <label><input type="checkbox" id="spark"> Sparkle dots (ss02)</label>
-      <label><input type="checkbox" id="compare"> Show Comfortaa underneath</label>
-      <label><input type="checkbox" id="dark"> Dark background</label>
-    </div>
-
-    <pre id="css"></pre>
-  </aside>
-
-  <main>
-    <h2>Headline (click to edit)</h2>
-    <div class="cd hero live" contenteditable spellcheck="false">Cooldown ready!</div>
-    <div class="ref hero" data-mirror="0">Cooldown ready!</div>
-
-    <h2>Mirror letters</h2>
-    <div class="cd hero live">bdpq · Il1 · ij</div>
-    <div class="ref hero">bdpq · Il1 · ij</div>
-
-    <h2>Reading (click to edit)</h2>
-    <div class="cd read live" contenteditable spellcheck="false">
-      Cold Snap: every frost spell is ready again, right now. The quick brown fox jumps over the lazy dog,
-      and Zoë quietly picks up five dozen jugs of liquid wax.
-      <br><br>Les élèves découvrent la science en jouant : une énigme, un indice, et hop, la porte s'ouvre !
-      Où est passé le pingouin ? Derrière la bibliothèque, bien sûr.
-    </div>
-    <div class="ref read" data-mirror="1">
-      Cold Snap: every frost spell is ready again, right now. The quick brown fox jumps over the lazy dog,
-      and Zoë quietly picks up five dozen jugs of liquid wax.
-      <br><br>Les élèves découvrent la science en jouant : une énigme, un indice, et hop, la porte s'ouvre !
-      Où est passé le pingouin ? Derrière la bibliothèque, bien sûr.
-    </div>
-    <p class="tag">Grey text underneath = Comfortaa at the same weight, for comparison.</p>
-
-    <h2>Small print</h2>
-    <div class="cd live" style="font-size:14px; line-height:1.6; max-width:40em">
-      Small sizes show the x-height best. Minimum 3 players · ages 8+ · 45 min ·
-      0123456789 · € £ $ & @ % ? ! ❄
-    </div>
+    <p class="lab__css" id="css"></p>
   </main>
-</div>
-<script>
-  const AXES = [
-    ["wght", "Weight", 300, 400, 700, 1, "Thin to bold, same as Comfortaa."],
-    ["XHGT", "x-height", 470, 547, 600, 1, "Taller or shorter lowercase. Caps and tall letters stay put. 547 = Comfortaa."],
-    ["WOBL", "Wobble", 0, 0, 1, 0.01, "Every letter tilts its own way, up to 10°, for a goofy hand-made feel. 0 = straight."],
-  ];
-  const PRESETS = {
-    comfortaa: { wght: 400, XHGT: 547, WOBL: 0 },
-    default:   { wght: 400, XHGT: 547, WOBL: 0 },
-    reading:   { wght: 400, XHGT: 575, WOBL: 0 },
-    title:     { wght: 700, XHGT: 560, WOBL: 0.6 },
-  };
-  const val = {}, box = document.getElementById("axes");
-  for (const [tag, name, lo, df, hi, step, help] of AXES) {
-    val[tag] = df;
-    const d = document.createElement("div");
-    d.className = "ax";
-    d.innerHTML = `<label>${name} <span><output id="o-${tag}">${df}</output><button title="Reset">reset</button></span></label>
-      <input id="i-${tag}" type="range" min="${lo}" max="${hi}" step="${step}" value="${df}">
-      <p>${help}</p>`;
-    box.appendChild(d);
-    const input = d.querySelector("input");
-    const reset = () => { input.value = df; input.dispatchEvent(new Event("input")); };
-    input.addEventListener("input", () => { val[tag] = +input.value; apply(); });
-    input.addEventListener("dblclick", reset);
-    d.querySelector("button").addEventListener("click", reset);
-  }
-  function setAll(p) {
-    for (const [tag, v] of Object.entries(p)) { document.getElementById("i-" + tag).value = v; val[tag] = v; }
-    apply();
-  }
-  document.querySelectorAll(".presets button").forEach(b => b.addEventListener("click", () => setAll(PRESETS[b.dataset.p])));
-
-  const size = document.getElementById("size"), spark = document.getElementById("spark"), tail = document.getElementById("tail");
-  size.addEventListener("input", apply);
-  spark.addEventListener("change", apply);
-  tail.addEventListener("change", apply);
-  document.getElementById("compare").addEventListener("change", e => document.body.classList.toggle("compare", e.target.checked));
-  document.getElementById("dark").addEventListener("change", e =>
-    document.documentElement.dataset.theme = e.target.checked ? "dark" : "light");
-
-  // keep the grey Comfortaa copies in sync with edits
-  document.querySelectorAll(".cd.live[contenteditable]").forEach((el, i) =>
-    el.addEventListener("input", () => { const m = document.querySelector(`[data-mirror="${i}"]`); if (m) m.innerHTML = el.innerHTML; }));
-
-  function apply() {
-    const fvs = AXES.map(([t]) => `"${t}" ${val[t]}`).join(", ");
-    const feats = [spark.checked && '"ss02" 1', tail.checked && '"ss03" 1'].filter(Boolean);
-    const ffs = feats.length ? feats.join(", ") : "normal";
-    document.querySelectorAll(".cd").forEach(el => { el.style.fontVariationSettings = fvs; el.style.fontFeatureSettings = ffs; });
-    document.querySelectorAll(".ref").forEach(el => el.style.fontVariationSettings = `"wght" ${val.wght}`);
-    for (const [t] of AXES) document.getElementById("o-" + t).textContent = val[t];
-    document.documentElement.style.setProperty("--size", size.value + "px");
-    document.getElementById("sizeo").textContent = size.value + "px";
-    document.getElementById("css").textContent =
-      `font-family: "Cooldown";\nfont-variation-settings: ${fvs};` + (feats.length ? `\nfont-feature-settings: ${ffs};` : "");
-  }
-  apply();
-</script>
 </body>
 </html>
