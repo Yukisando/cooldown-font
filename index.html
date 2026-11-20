@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Snap Sans specimen</title>
+<style>
+  @font-face { font-family: "Snap Sans"; src: url("fonts/SnapSans[wght,FRST].woff2") format("woff2");
+               font-weight: 300 700; font-display: block; }
+  @font-face { font-family: "Comfortaa Ref"; src: url("src/Comfortaa-VariableFont_wght.ttf");
+               font-weight: 300 700; }
+  :root { --w: 400; --f: 0; --size: 28px; --ink: #1d2b3a; --ice: #3b8fd4; --bg: #f6f9fc; }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 24px 16px 60px; background: var(--bg); color: var(--ink);
+         font-family: "Snap Sans", sans-serif; }
+  main { max-width: 980px; margin: 0 auto; }
+  .snap { font-family: "Snap Sans"; font-variation-settings: "wght" var(--w), "FRST" var(--f); }
+  .ref  { font-family: "Comfortaa Ref"; font-variation-settings: "wght" var(--w); }
+  h1 { font-size: clamp(48px, 10vw, 110px); margin: 0 0 4px; line-height: 1; }
+  .controls { display: flex; flex-wrap: wrap; gap: 12px 28px; margin: 24px 0; padding: 16px;
+              background: #fff; border: 2px solid #dde7f0; border-radius: 14px; position: sticky; top: 8px; }
+  .controls label { display: flex; align-items: center; gap: 10px; font-size: 15px; }
+  .controls output { min-width: 3ch; font-weight: 700; }
+  section { margin: 36px 0; }
+  h2 { font-size: 15px; letter-spacing: .08em; text-transform: uppercase; color: var(--ice); margin: 0 0 10px; }
+  .row { font-size: var(--size); line-height: 1.5; }
+  .pair { display: grid; grid-template-columns: 110px 1fr; gap: 6px 16px; align-items: baseline; }
+  .pair small { font-size: 13px; opacity: .6; font-family: "Snap Sans"; }
+  .big { font-size: clamp(56px, 12vw, 140px); line-height: 1.1; }
+  .flake { color: var(--ice); }
+  p.note { font-size: 15px; max-width: 60ch; line-height: 1.5; opacity: .8; }
+</style>
+</head>
+<body>
+<main>
+  <h1 class="snap">Snap Sans <span class="flake">❄</span></h1>
+  <p class="note">Built on Comfortaa, with more air between letters, a d and q that are no longer mirror
+    images of b and p, and a Frost axis that turns the dots on i, j and punctuation into ice sparkles.</p>
+
+  <div class="controls">
+    <label>Weight <input id="w" type="range" min="300" max="700" value="400"><output id="wo">400</output></label>
+    <label>Frost <input id="f" type="range" min="0" max="100" value="0"><output id="fo">0</output></label>
+    <label>Size <input id="s" type="range" min="14" max="72" value="28"><output id="so">28</output></label>
+  </div>
+
+  <section>
+    <h2>Mirror letters</h2>
+    <div class="pair big"><small>Comfortaa</small><span class="ref">bdpq</span>
+      <small>Snap Sans</small><span class="snap">bdpq</span></div>
+  </section>
+
+  <section>
+    <h2>Side by side</h2>
+    <div class="pair row">
+      <small>Comfortaa</small><span class="ref">Il1 | O0 | rn m | bad dog, quick pup.</span>
+      <small>Snap Sans</small><span class="snap">Il1 | O0 | rn m | bad dog, quick pup.</span>
+    </div>
+  </section>
+
+  <section>
+    <h2>Frost</h2>
+    <div class="big snap">ij !? …: ❄</div>
+  </section>
+
+  <section>
+    <h2>Reading</h2>
+    <div class="row snap">
+      Cold Snap: every frost spell is ready again, right now. The quick brown fox jumps over the lazy dog.
+      <br>Les élèves découvrent la science en jouant : une énigme, un indice, et hop, la porte s'ouvre !
+      <br>0123456789 · Zoë, Æsir, Œuvre, Ñandú, Ĳssel, Łódź · ₴ € £ $ & @ % ?
+    </div>
+  </section>
+
+  <section>
+    <h2>All weights</h2>
+    <div class="row snap" id="weights"></div>
+  </section>
+</main>
+<script>
+  const root = document.documentElement;
+  for (const [id, prop, unit] of [["w", "--w", ""], ["f", "--f", ""], ["s", "--size", "px"]]) {
+    const el = document.getElementById(id), out = document.getElementById(id + "o");
+    el.addEventListener("input", () => { root.style.setProperty(prop, el.value + unit); out.textContent = el.value; });
+  }
+  const box = document.getElementById("weights");
+  for (const [w, n] of [[300, "Light"], [400, "Regular"], [500, "Medium"], [600, "SemiBold"], [700, "Bold"]]) {
+    const d = document.createElement("div");
+    d.style.fontVariationSettings = `"wght" ${w}, "FRST" var(--f)`;
+    d.textContent = `${n} ${w} — Hidden quests and frozen jewels`;
+    box.appendChild(d);
+  }
+</script>
+</body>
+</html>
