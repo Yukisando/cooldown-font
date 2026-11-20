@@ -56,7 +56,7 @@
 <div class="wrap">
   <aside>
     <h1>Cooldown <span>❄</span></h1>
-    <p class="sub">Every candidate axis at once. Double-click a slider to reset it.</p>
+    <p class="sub">Spacing is built in (+15 per side). Double-click a slider to reset it.</p>
 
     <div class="presets">
       <button data-p="comfortaa">Like Comfortaa</button>
@@ -105,7 +105,7 @@
 
     <h2>Small print</h2>
     <div class="cd live" style="font-size:14px; line-height:1.6; max-width:40em">
-      Small sizes show the x-height and Air axes best. Minimum 3 players · ages 8+ · 45 min ·
+      Small sizes show the x-height best. Minimum 3 players · ages 8+ · 45 min ·
       0123456789 · € £ $ & @ % ? ! ❄
     </div>
   </main>
@@ -113,17 +113,15 @@
 <script>
   const AXES = [
     ["wght", "Weight", 300, 400, 700, 1, "Thin to bold, same as Comfortaa."],
-    ["SPAC", "Air", 0, 15, 60, 1, "Extra space on each side of every letter, words get more too. 0 = Comfortaa, 15 = Cooldown default."],
-    ["XHGT", "x-height", 520, 547, 620, 1, "Taller or shorter lowercase. Caps and tall letters stay put. 547 = Comfortaa."],
-    ["GRAD", "Grade", -100, 0, 150, 1, "Darker or lighter strokes without letters getting wider, so lines never reflow. Little effect near Light / Bold extremes."],
-    ["slnt", "Slant", -10, 0, 0, 0.5, "A lean to the right, in degrees. Harder to read for dyslexic readers: headings only."],
-    ["wdth", "Width", 80, 100, 120, 1, "Narrower or wider letters, in percent. Strokes get thinner when narrow."],
+    ["XHGT", "x-height", 520, 547, 600, 1, "Taller or shorter lowercase. Caps and tall letters stay put. 547 = Comfortaa."],
+    ["TAIL", "Queue d / q", 0, 1, 1, 0.01, "0 = Comfortaa, d and q mirror b and p. 1 = full foot like the l, best for dyslexic readers."],
+    ["WOBL", "Wobble", 0, 0, 1, 0.01, "Every letter tilts its own way, up to 10°, for a goofy hand-made feel. 0 = straight."],
   ];
   const PRESETS = {
-    comfortaa: { wght: 400, SPAC: 0, XHGT: 547, GRAD: 0, slnt: 0, wdth: 100 },
-    default:   { wght: 400, SPAC: 15, XHGT: 547, GRAD: 0, slnt: 0, wdth: 100 },
-    reading:   { wght: 400, SPAC: 30, XHGT: 580, GRAD: 40, slnt: 0, wdth: 100 },
-    title:     { wght: 700, SPAC: 10, XHGT: 560, GRAD: 0, slnt: -6, wdth: 106 },
+    comfortaa: { wght: 400, XHGT: 547, TAIL: 0, WOBL: 0 },
+    default:   { wght: 400, XHGT: 547, TAIL: 1, WOBL: 0 },
+    reading:   { wght: 400, XHGT: 575, TAIL: 1, WOBL: 0 },
+    title:     { wght: 700, XHGT: 560, TAIL: 1, WOBL: 0.6 },
   };
   const val = {}, box = document.getElementById("axes");
   for (const [tag, name, lo, df, hi, step, help] of AXES) {

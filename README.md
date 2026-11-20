@@ -12,14 +12,14 @@ Comfortaa's round, friendly shapes, and fixes the parts that make readers stumbl
 - **More room.** Every letter gets 15 more units on each side (3% of the em) and
   the space gets 40 more, so words don't blur together.
 - **No mirror letters.** In Comfortaa, `d` and `q` are exact mirrors of `b` and
-  `p`. Here they end in the same curved foot as Comfortaa's own `l`, so each
-  letter has a shape of its own and can't be read flipped.
+  `p`. Here they end in the same curved foot as Comfortaa's own `l` (the Tail
+  axis dials it from 0 to full), so each letter has a shape of its own.
 - **Sparkles.** Stylistic set `ss02` (on/off, `font-feature-settings: "ss02" 1`):
   the dots on i, j, ! ? . : ; and the accents become four-point ice sparkles.
-- **Lab axes, to try out.** `fonts/Cooldown-Lab` has every candidate axis:
-  Air `SPAC` 0–60 (default 15), x-height `XHGT` 520–620, Grade `GRAD` −100–150,
-  Slant `slnt` −10–0, Width `wdth` 80–120, plus Weight 300–700. Once the
-  keepers are picked, the others get dropped from `AXES` in `build.py`.
+- **Axes.** Weight 300–700, x-height `XHGT` 520–600 (547 = Comfortaa),
+  Tail `TAIL` 0–1 (0 = Comfortaa's d/q, 1 = full foot, the default) and
+  Wobble `WOBL` 0–1 (each letter tilts its own way, up to 10°, for a goofy look).
+  Spacing is fixed at +15 per side; tracking is a CSS job.
 - **❄** A snowflake glyph on U+2744, U+2745 and U+2746 that follows the weight.
 
 `Il1` and `O0` were already easy to tell apart in Comfortaa, so they stay.

@@ -3,26 +3,24 @@
     python build.py
 
 Reads  src/Comfortaa-VariableFont_wght.ttf
-Writes fonts/Cooldown-Lab.ttf and .woff2 (every candidate axis, for testing)
+Writes fonts/Cooldown-Lab.ttf and .woff2
 
 Fixed changes on top of Comfortaa:
-  - d and q get the foot of Comfortaa's own l, so they stop being
-    mirror images of b and p
+  - more letter and word spacing (easier for dyslexic readers)
   - a snowflake glyph on U+2744 / U+2745 / U+2746
   - ss02: i/j tittles and punctuation dots become ice sparkles (on/off)
 
-Candidate axes (the lab font has all of them; keep the ones you like):
+Axes:
   wght  300-700  weight (Comfortaa's own)
-  SPAC  0-60     Air: extra units on each side of every letter (default 15)
-  XHGT  520-620  x-height in units (Comfortaa: 547)
-  GRAD  -100-150 grade: darker / lighter without changing letter widths
-  slnt  -10-0    slant in degrees
-  wdth  80-120   width in percent
+  XHGT  520-600  x-height in units (Comfortaa: 547)
+  TAIL  0-1      d and q foot: 0 = Comfortaa (mirror of b/p), 1 = full foot like l
+  WOBL  0-1      goofy: every letter tilts its own way, up to WOBBLE_DEG degrees
 Rename the font by changing FAMILY below.
 """
 import copy
 import math
 import unicodedata
+import zlib
 from pathlib import Path
 
 from fontTools.designspaceLib import (AxisDescriptor, DesignSpaceDocument,
@@ -38,25 +36,25 @@ from fontTools.varLib import instancer
 from fontTools.varLib.featureVars import addFeatureVariations
 
 FAMILY = "Cooldown"
-VERSION = 1.1
+VERSION = 1.2
 DESIGNER = "Nathan de Castro (ColdSnap)"
 VENDOR = "CSNP"
 OUT_NAME = "Cooldown-Lab"
 
-WORD_PER_SPAC = 14 / 3   # space gets this much extra per unit of Air
+SPACING = 15             # extra units on each side of every glyph (UPM 1000)
+WORD_SPACING = 40        # extra units on the space on top of that
 SPARKLE_N = 0.65         # superellipse exponent: 1 = diamond, < 1 = concave star
 SPARKLE_K = 1.45         # how far the sparkle points reach, in dot radii
+WOBBLE_DEG = 10          # max tilt per letter at WOBL 1
 XH = 547                 # Comfortaa's x-height
 ASC = 781
 
 # tag: (name, min, default, max)
 AXES = {
     "wght": ("Weight", 300, 400, 700),
-    "SPAC": ("Air", 0, 15, 60),
-    "XHGT": ("x-height", 520, XH, 620),
-    "GRAD": ("Grade", -100, 0, 150),
-    "slnt": ("Slant", -10, 0, 0),
-    "wdth": ("Width", 80, 100, 120),
+    "XHGT": ("x-height", 520, XH, 600),
+    "TAIL": ("Tail", 0, 1, 1),
+    "WOBL": ("Wobble", 0, 0, 1),
 }
 MASTER_WEIGHTS = [300, 400, 700]
 STYLES = [(300, "Light"), (400, "Regular"), (500, "Medium"),
@@ -95,6 +93,15 @@ def map_points(g, fn):
     g.coordinates = GlyphCoordinates([fn(x, y) for x, y in g.coordinates])
 
 
+def empty_glyph():
+    g = Glyph()
+    g.numberOfContours, g.endPtsOfContours = 0, []
+    g.coordinates, g.flags = GlyphCoordinates([]), bytearray()
+    g.program = ttProgram.Program()
+    g.program.fromBytecode(b"")
+    return g
+
+
 def add_glyph(font, name, glyph, metrics):
     order = font.getGlyphOrder()
     if name not in order:
@@ -106,8 +113,9 @@ def add_glyph(font, name, glyph, metrics):
 
 
 # ------------------------------------------------------------- d / q feet
-def add_foot(font, base, stem_zone, drop):
-    """Union Comfortaa's l onto the stem of `base` so it ends in the same foot."""
+def add_foot(font, base, stem_zone, drop, tail):
+    """Union Comfortaa's l onto the stem of `base` so it ends in the same foot.
+    tail 0 keeps the same points but folds the foot away inside the stem."""
     glyf, hmtx = font["glyf"], font["hmtx"]
     l = glyf["l"]
     lpts = list(l.coordinates)
@@ -127,19 +135,26 @@ def add_foot(font, base, stem_zone, drop):
     if drop:   # q: foot sits on the descender; trim both stems so nothing pokes out
         b_bottom = min(p[1] for p in bpts)
         dy = b_bottom
-        cap_lift = (l_curve_y + dy) - b_bottom
+        cap_lift = ((l_curve_y + dy) - b_bottom) * tail
         cap_y = b_bottom + (bx1 - bx0) / 2 + 1
         g.coordinates = GlyphCoordinates(
             [(x, y + cap_lift) if y <= cap_y else (x, y) for x, y in bpts])
         hide_top = 200
         foot = [(bc + (x - lc) * scale, y + dy - ((l_top + dy) - hide_top if y >= 700 else 0))
                 for x, y in lpts]
+        anchor = (bc, b_bottom + (bx1 - bx0) / 2)   # centre of the stem cap
     else:
         foot = [(bc + (x - lc) * scale, y) for x, y in lpts]
+        anchor = (bc, 175)   # low on the stem, still inside the bowl
+    if not tail:
+        # The curve and foot collapse onto one point inside the stem, so in
+        # between they shrink smoothly towards it (a smaller, thinner foot).
+        foot = [anchor if lp[1] <= l_curve_y else (fp[0], max(fp[1], anchor[1]))
+                for lp, fp in zip(lpts, foot)]
 
     append_contour(g, foot, [f & 1 for f in l.flags])
     old_adv = hmtx[base][0]
-    new_adv = max(old_adv, round(max(p[0] for p in foot) + l_rsb))
+    new_adv = max(old_adv, round(max(p[0] for p in foot) + l_rsb)) if tail else old_adv
     delta = new_adv - old_adv
     hmtx[base] = (new_adv, hmtx[base][1])
     for name in font.getGlyphOrder():
@@ -176,11 +191,7 @@ def add_snowflake(font):
     arm, cy = 330, 390
     adv = round(2 * (arm * math.cos(math.radians(30)) + w / 2) + 120)
     cx = adv / 2
-    g = Glyph()
-    g.numberOfContours, g.endPtsOfContours = 0, []
-    g.coordinates, g.flags = GlyphCoordinates([]), bytearray()
-    g.program = ttProgram.Program()
-    g.program.fromBytecode(b"")
+    g = empty_glyph()
     for k in range(6):
         a = math.radians(90 + 60 * k)
         append_contour(g, *capsule((cx, cy), (cx + arm * math.cos(a), cy + arm * math.sin(a)), w))
@@ -196,23 +207,8 @@ def add_snowflake(font):
                 t.cmap[cp] = "uni2744"
 
 
-# ------------------------------------------------------------------ grade
-def regrade(font, donor):
-    """Take outlines from a heavier/lighter donor, centred in this font's advances."""
-    glyf, dglyf, hmtx = font["glyf"], donor["glyf"], font["hmtx"]
-    dx = {n: (hmtx[n][0] - donor["hmtx"][n][0]) / 2 for n in font.getGlyphOrder()}
-    for n in font.getGlyphOrder():
-        d = dglyf[n]
-        if d.numberOfContours > 0:
-            glyf[n].coordinates = GlyphCoordinates([(x + dx[n], y) for x, y in d.coordinates])
-        elif d.isComposite():
-            for c, dc in zip(glyf[n].components, d.components):
-                c.x, c.y = round(dc.x + dx[n] - dx[dc.glyphName]), dc.y
-
-
 # --------------------------------------------------------------- x-height
 def lowercase_set(font):
-    """Simple glyphs that draw lowercase letters, and lowercase composites."""
     glyf, simple, comps = font["glyf"], set(), set()
     def base_of(n):
         while glyf[n].isComposite():
@@ -226,8 +222,8 @@ def lowercase_set(font):
     return simple, comps
 
 
-def raise_xheight(font, d, lower):
-    simple, comps = lower
+def raise_xheight(font, d):
+    simple, comps = lowercase_set(font)
     glyf = font["glyf"]
     def t(y):
         if y <= XH * .25:
@@ -246,45 +242,6 @@ def raise_xheight(font, d, lower):
             cg.recalcBounds(glyf)
             if getattr(cg, "yMin", 0) + c.y > XH * .5:
                 c.y += d
-
-
-# --------------------------------------------------------- width, air, slant
-def set_width(font, pct):
-    f = pct / 100
-    glyf, hmtx = font["glyf"], font["hmtx"]
-    for n in font.getGlyphOrder():
-        g = glyf[n]
-        if g.numberOfContours > 0:
-            map_points(g, lambda x, y: (round(x * f), y))
-        elif g.isComposite():
-            for c in g.components:
-                c.x = round(c.x * f)
-        hmtx[n] = (round(hmtx[n][0] * f), hmtx[n][1])
-
-
-def add_air(font, spac):
-    glyf, hmtx = font["glyf"], font["hmtx"]
-    space = {font.getBestCmap().get(cp) for cp in (0x20, 0xA0)}
-    for n in font.getGlyphOrder():
-        g = glyf[n]
-        if g.numberOfContours > 0:
-            g.coordinates.translate((spac, 0))
-        adv, lsb = hmtx[n]
-        if adv > 0:
-            adv += 2 * spac + (round(spac * WORD_PER_SPAC) if n in space else 0)
-        hmtx[n] = (adv, lsb)
-
-
-def slant(font, deg):
-    k = math.tan(math.radians(-deg))
-    glyf = font["glyf"]
-    for n in font.getGlyphOrder():
-        g = glyf[n]
-        if g.numberOfContours > 0:
-            map_points(g, lambda x, y: (round(x + y * k), y))
-        elif g.isComposite():
-            for c in g.components:
-                c.x = round(c.x + c.y * k)
 
 
 # --------------------------------------------------------- sparkles (ss02)
@@ -334,7 +291,7 @@ def add_sparkle_feature(font, dots):
         by_glyph.setdefault(n, []).append(i)
     targets = set(by_glyph)
     changed = True
-    while changed:                      # composites that use a dotted glyph
+    while changed:
         changed = False
         for n in font.getGlyphOrder():
             g = glyf[n]
@@ -381,6 +338,58 @@ def add_sparkle_feature(font, dots):
                 ls.FeatureCount = len(ls.FeatureIndex)
 
 
+# ------------------------------------------------- decompose, air, wobble
+def decompose_all(font):
+    """Flatten composites so accented letters can tilt as one piece."""
+    glyf = font["glyf"]
+    flat = {}
+    for n in font.getGlyphOrder():
+        g = glyf[n]
+        if g.isComposite():
+            coords, ends, flags = g.getCoordinates(glyf)
+            flat[n] = (list(coords), list(ends), [f & 1 for f in flags])
+    for n, (coords, ends, flags) in flat.items():
+        g = empty_glyph()
+        g.coordinates = GlyphCoordinates([(round(x), round(y)) for x, y in coords])
+        g.flags = bytearray(flags)
+        g.endPtsOfContours = ends
+        g.numberOfContours = len(ends)
+        if ends:
+            g.flags[0] |= flagOverlapSimple
+        glyf[n] = g
+
+
+def add_air(font):
+    glyf, hmtx = font["glyf"], font["hmtx"]
+    space = {font.getBestCmap().get(cp) for cp in (0x20, 0xA0)}
+    for n in font.getGlyphOrder():
+        g = glyf[n]
+        if g.numberOfContours > 0:
+            g.coordinates.translate((SPACING, 0))
+        adv, lsb = hmtx[n]
+        if adv > 0:
+            adv += 2 * SPACING + (WORD_SPACING if n in space else 0)
+        hmtx[n] = (adv, lsb)
+
+
+def wobble(font):
+    """Tilt every glyph around its own centre by a fixed pseudo-random angle."""
+    glyf = font["glyf"]
+    for n in font.getGlyphOrder():
+        g = glyf[n]
+        if g.numberOfContours <= 0:
+            continue
+        h = zlib.crc32(n.removesuffix(".ss02").encode())
+        mag = 0.35 + 0.65 * ((h & 0xFFFF) / 0xFFFF)
+        deg = WOBBLE_DEG * mag * (1 if h & 0x10000 else -1)
+        a = math.radians(deg)
+        ca, sa = math.cos(a), math.sin(a)
+        g.recalcBounds(glyf)
+        cx, cy = (g.xMin + g.xMax) / 2, (g.yMin + g.yMax) / 2
+        map_points(g, lambda x, y: (round(cx + (x - cx) * ca - (y - cy) * sa),
+                                    round(cy + (x - cx) * sa + (y - cy) * ca)))
+
+
 # ----------------------------------------------------------------- masters
 def source_without_featvars():
     """Comfortaa swaps one glyph at heavy weights via FeatureVariations; drop it
@@ -402,7 +411,7 @@ def source_without_featvars():
     return font, swaps
 
 
-def prepared(wght):
+def prepared(wght, tail=1):
     font = instancer.instantiateVariableFont(source_without_featvars()[0], {"wght": wght})
     for tag in ("prep", "fpgm", "cvt "):
         if tag in font:
@@ -411,28 +420,22 @@ def prepared(wght):
         if hasattr(g, "program"):
             g.program = ttProgram.Program()
             g.program.fromBytecode(b"")
-    add_foot(font, "d", lambda y: y > 600, drop=False)
-    add_foot(font, "q", lambda y: y < -100, drop=True)
+    add_foot(font, "d", lambda y: y > 600, drop=False, tail=tail)
+    add_foot(font, "q", lambda y: y < -100, drop=True, tail=tail)
     add_snowflake(font)
     return font
 
 
 def make_master(loc, dots):
     v = {t: a[2] for t, a in AXES.items()} | loc
-    w = v["wght"]
-    font = prepared(w)
-    if v["GRAD"]:
-        donor_w = max(300, min(700, w + v["GRAD"]))
-        if donor_w != w:
-            regrade(font, prepared(donor_w))
+    font = prepared(v["wght"], v["TAIL"])
     if v["XHGT"] != XH:
-        raise_xheight(font, v["XHGT"] - XH, lowercase_set(font))
-    if v["wdth"] != 100:
-        set_width(font, v["wdth"])
-    add_air(font, v["SPAC"])
+        raise_xheight(font, v["XHGT"] - XH)
     add_sparkle_feature(font, dots)
-    if v["slnt"]:
-        slant(font, v["slnt"])
+    decompose_all(font)
+    add_air(font)
+    if v["WOBL"]:
+        wobble(font)
     glyf = font["glyf"]
     for name in font.getGlyphOrder():
         g = glyf[name]
