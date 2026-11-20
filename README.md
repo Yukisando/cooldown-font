@@ -14,9 +14,12 @@ Comfortaa's round, friendly shapes, and fixes the parts that make readers stumbl
 - **No mirror letters.** In Comfortaa, `d` and `q` are exact mirrors of `b` and
   `p`. Here they end in the same curved foot as Comfortaa's own `l`, so each
   letter has a shape of its own and can't be read flipped.
-- **Frost.** A second axis, `FRST` (0–100). At 0 the font is clear and calm for
-  reading. Turned up, the dots on i, j, ! ? . : ; and the accents become
-  four-point ice sparkles. Use it for titles and logos.
+- **Sparkles.** Stylistic set `ss02` (on/off, `font-feature-settings: "ss02" 1`):
+  the dots on i, j, ! ? . : ; and the accents become four-point ice sparkles.
+- **Lab axes, to try out.** `fonts/Cooldown-Lab` has every candidate axis:
+  Air `SPAC` 0–60 (default 15), x-height `XHGT` 520–620, Grade `GRAD` −100–150,
+  Slant `slnt` −10–0, Width `wdth` 80–120, plus Weight 300–700. Once the
+  keepers are picked, the others get dropped from `AXES` in `build.py`.
 - **❄** A snowflake glyph on U+2744, U+2745 and U+2746 that follows the weight.
 
 `Il1` and `O0` were already easy to tell apart in Comfortaa, so they stay.
@@ -25,9 +28,9 @@ Comfortaa's round, friendly shapes, and fixes the parts that make readers stumbl
 
 | File | What |
 |---|---|
-| `fonts/Cooldown[wght,FRST].woff2` | For websites |
-| `fonts/Cooldown[wght,FRST].ttf` | To install on Windows / Mac |
-| `index.html` | Specimen with Weight / Frost / Size sliders (serve the folder, e.g. `python -m http.server`) |
+| `fonts/Cooldown-Lab.woff2` | For websites |
+| `fonts/Cooldown-Lab.ttf` | To install on Windows / Mac |
+| `index.html` | Lab page with a slider per axis (serve the folder, e.g. `python -m http.server`) |
 | `build.py` | Rebuilds everything from `src/` |
 
 ## Use on a website
@@ -35,12 +38,12 @@ Comfortaa's round, friendly shapes, and fixes the parts that make readers stumbl
 ```css
 @font-face {
   font-family: "Cooldown";
-  src: url("Cooldown[wght,FRST].woff2") format("woff2");
+  src: url("Cooldown-Lab.woff2") format("woff2");
   font-weight: 300 700;
   font-display: swap;
 }
 body  { font-family: "Cooldown", sans-serif; }
-h1    { font-variation-settings: "FRST" 100; }
+h1    { font-feature-settings: "ss02" 1; }
 ```
 
 ## Rebuild or rename
