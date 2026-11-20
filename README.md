@@ -17,7 +17,7 @@ Comfortaa's round, friendly shapes, and fixes the parts that make readers stumbl
 - **Sparkles.** Stylistic set `ss02` (on/off, `font-feature-settings: "ss02" 1`):
   the dots on i, j, ! ? . : ; and the accents become four-point ice sparkles.
 - **Axes.** Weight 300–700, x-height `XHGT` 520–600 (547 = Comfortaa),
-  Tail `TAIL` 0–1 (0 = Comfortaa's d/q, the default; turned up, a rounded foot grows and curls out of d and q) and
+  Unroll `UNRL` 0–1 (letters are one pen line: low rolls tails in, high runs them out into a curl and opens a small gap in loops; 0.25 ≈ Comfortaa, default 0.4; prototype on o a b d p q l j) and
   Wobble `WOBL` 0–1 (each letter tilts its own way, up to 10°, for a goofy look).
   Spacing is fixed at +15 per side; tracking is a CSS job.
 - **❄** A snowflake glyph on U+2744, U+2745 and U+2746 that follows the weight.
