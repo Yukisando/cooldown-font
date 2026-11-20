@@ -13,10 +13,11 @@ Fixed changes on top of Comfortaa:
 Axes:
   wght  300-700  weight (Comfortaa's own)
   XHGT  520-600  x-height in units (Comfortaa: 547)
-  TAIL  0-1      d and q foot: 0 = Comfortaa (mirror of b/p), 1 = full foot like l
+  TAIL  0-1      d and q foot: 0 = Comfortaa (default), 1 = full foot like l
   WOBL  0-1      goofy: every letter tilts its own way, up to WOBBLE_DEG degrees
 Rename the font by changing FAMILY below.
 """
+import bisect
 import copy
 import math
 import unicodedata
@@ -36,7 +37,7 @@ from fontTools.varLib import instancer
 from fontTools.varLib.featureVars import addFeatureVariations
 
 FAMILY = "Cooldown"
-VERSION = 1.2
+VERSION = 1.3
 DESIGNER = "Nathan de Castro (ColdSnap)"
 VENDOR = "CSNP"
 OUT_NAME = "Cooldown-Lab"
@@ -46,6 +47,10 @@ WORD_SPACING = 40        # extra units on the space on top of that
 SPARKLE_N = 0.65         # superellipse exponent: 1 = diamond, < 1 = concave star
 SPARKLE_K = 1.45         # how far the sparkle points reach, in dot radii
 WOBBLE_DEG = 10          # max tilt per letter at WOBL 1
+FILLET = 35              # radius of the round where two straight edges meet
+BLEND = 50               # how far up a stem a curve melts into it
+CORNER_DEG = 35          # a turn sharper than this counts as a corner
+TAIL_STEPS = [0.25, 0.5, 0.75, 1]   # extra masters so the foot grows along its curve
 XH = 547                 # Comfortaa's x-height
 ASC = 781
 
@@ -53,7 +58,7 @@ ASC = 781
 AXES = {
     "wght": ("Weight", 300, 400, 700),
     "XHGT": ("x-height", 520, XH, 600),
-    "TAIL": ("Tail", 0, 1, 1),
+    "TAIL": ("Tail", 0, 0, 1),
     "WOBL": ("Wobble", 0, 0, 1),
 }
 MASTER_WEIGHTS = [300, 400, 700]
@@ -113,48 +118,82 @@ def add_glyph(font, name, glyph, metrics):
 
 
 # ------------------------------------------------------------- d / q feet
+FOOT_SAMPLES = 16
+
+
+def stroke_path(x0, y_start, yc, rx, ry):
+    """Dense centreline: straight down to yc, then a quarter ellipse curling right."""
+    pts = [(x0, y_start + (yc - y_start) * i / 60) for i in range(61)]
+    if rx > .5 and ry > .5:
+        pts += [(x0 + rx + rx * math.cos(th), yc + ry * math.sin(th))
+                for th in (math.pi + math.pi / 2 * i / 120 for i in range(1, 121))]
+    return pts
+
+
+def round_stroke(path, w, n=FOOT_SAMPLES):
+    """Round-ended stroke along `path`, always the same number of points,
+    drawn with off-curve points so the sides stay smooth curves."""
+    lens = [0]
+    for a, b in zip(path, path[1:]):
+        lens.append(lens[-1] + math.dist(a, b))
+    samples = []
+    for k in range(n + 1):
+        s = lens[-1] * k / n
+        i = min(max(bisect.bisect_left(lens, s), 1), len(lens) - 1)
+        a, b = path[i - 1], path[i]
+        seg = (lens[i] - lens[i - 1]) or 1
+        f = (s - lens[i - 1]) / seg
+        samples.append(((a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f),
+                        ((b[0] - a[0]) / seg, (b[1] - a[1]) / seg)))
+    r = w / 2
+    left = [(x - ty * r, y + tx * r) for (x, y), (tx, ty) in samples]
+    right = [(x + ty * r, y - tx * r) for (x, y), (tx, ty) in samples]
+    (ex, ey), (tx, ty) = samples[-1]
+    a = math.atan2(tx, -ty)
+    pts = [(left[0], True)] + [(p, False) for p in left[1:-1]] + [(left[-1], True)]
+    pts += arc(ex, ey, r, a, a - math.pi)
+    pts += [(p, False) for p in reversed(right[1:-1])] + [(right[0], True)]
+    return [p for p, _ in pts], [o for _, o in pts]
+
+
 def add_foot(font, base, stem_zone, drop, tail):
-    """Union Comfortaa's l onto the stem of `base` so it ends in the same foot.
-    tail 0 keeps the same points but folds the foot away inside the stem."""
+    """Grow a rounded foot out of the stem of `base`, shaped like Comfortaa's l.
+    The stroke really grows: at 0 it hides inside the letter, then it gets longer
+    and curls to the right, ending on a round cap at every value."""
     glyf, hmtx = font["glyf"], font["hmtx"]
     l = glyf["l"]
     lpts = list(l.coordinates)
     lstem = [p for p in lpts if p[1] > 300]
     lx0, lx1 = min(p[0] for p in lstem), max(p[0] for p in lstem)
+    lc, lr = (lx0 + lx1) / 2, (lx1 - lx0) / 2
     l_curve_y = min(p[1] for p in lpts if p[0] == lx0)
-    l_top = max(p[1] for p in lpts)
-    l_rsb = hmtx["l"][0] - max(p[0] for p in lpts)
+    l_xmax, l_ymin = max(p[0] for p in lpts), min(p[1] for p in lpts)
+    l_rsb = hmtx["l"][0] - l_xmax
+    rx, ry = (l_xmax - lr) - lc, l_curve_y - (l_ymin + lr)    # l's foot, centreline radii
 
     g = glyf[base]
     bpts = list(g.coordinates)
     bstem = [p for p in bpts if stem_zone(p[1])]
     bx0, bx1 = min(p[0] for p in bstem), max(p[0] for p in bstem)
-    scale = (bx1 - bx0) / (lx1 - lx0)
-    lc, bc = (lx0 + lx1) / 2, (bx0 + bx1) / 2
+    w, bc = bx1 - bx0, (bx0 + bx1) / 2
 
-    if drop:   # q: foot sits on the descender; trim both stems so nothing pokes out
+    if drop:   # q: the descender bends right at its bottom
         b_bottom = min(p[1] for p in bpts)
-        dy = b_bottom
-        cap_lift = ((l_curve_y + dy) - b_bottom) * tail
-        cap_y = b_bottom + (bx1 - bx0) / 2 + 1
+        yb = b_bottom + w / 2
+        lift = ry * tail                       # q's own round end hides inside the curl
+        cap_y = b_bottom + w / 2 + 1
         g.coordinates = GlyphCoordinates(
-            [(x, y + cap_lift) if y <= cap_y else (x, y) for x, y in bpts])
-        hide_top = 200
-        foot = [(bc + (x - lc) * scale, y + dy - ((l_top + dy) - hide_top if y >= 700 else 0))
-                for x, y in lpts]
-        anchor = (bc, b_bottom + (bx1 - bx0) / 2)   # centre of the stem cap
-    else:
-        foot = [(bc + (x - lc) * scale, y) for x, y in lpts]
-        anchor = (bc, 175)   # low on the stem, still inside the bowl
-    if not tail:
-        # The curve and foot collapse onto one point inside the stem, so in
-        # between they shrink smoothly towards it (a smaller, thinner foot).
-        foot = [anchor if lp[1] <= l_curve_y else (fp[0], max(fp[1], anchor[1]))
-                for lp, fp in zip(lpts, foot)]
+            [(x, y + lift) if y <= cap_y else (x, y) for x, y in bpts])
+        y_start = 150
+    else:      # d: a stem grows down out of the bowl and curls right on the baseline
+        yb = 250 + ((l_ymin + lr) - 250) * tail
+        y_start = 600
+    path = stroke_path(bc, y_start, yb + ry * tail, rx * tail, ry * tail)
+    foot, oncurve = round_stroke(path, w)
+    append_contour(g, foot, oncurve)
 
-    append_contour(g, foot, [f & 1 for f in l.flags])
     old_adv = hmtx[base][0]
-    new_adv = max(old_adv, round(max(p[0] for p in foot) + l_rsb)) if tail else old_adv
+    new_adv = max(old_adv, round(bc + rx * tail + w / 2 + l_rsb)) if tail else old_adv
     delta = new_adv - old_adv
     hmtx[base] = (new_adv, hmtx[base][1])
     for name in font.getGlyphOrder():
@@ -338,6 +377,67 @@ def add_sparkle_feature(font, dots):
                 ls.FeatureCount = len(ls.FeatureIndex)
 
 
+# ---------------------------------------------------------------- fillets
+def find_corners(font):
+    """(glyph, point index) of every on-curve point where the outline turns sharply."""
+    glyf, out = font["glyf"], []
+    for n in font.getGlyphOrder():
+        g = glyf[n]
+        if g.numberOfContours <= 0:
+            continue
+        pts = list(g.coordinates)
+        for s, e in ranges(g):
+            for i in range(s, e + 1):
+                if not g.flags[i] & 1:
+                    continue
+                p = pts[i - 1] if i > s else pts[e]
+                q = pts[i + 1] if i < e else pts[s]
+                v = pts[i]
+                a1 = math.atan2(v[1] - p[1], v[0] - p[0])
+                a2 = math.atan2(q[1] - v[1], q[0] - v[0])
+                turn = abs((math.degrees(a2 - a1) + 180) % 360 - 180)
+                if turn > CORNER_DEG and math.dist(p, v) > 2 and math.dist(q, v) > 2:
+                    out.append((n, i))
+    return out
+
+
+def round_corners(font, corners):
+    """Swap each corner point for a small curve (on, off, on): no spikes, no sharp notches."""
+    glyf, by = font["glyf"], {}
+    for n, i in corners:
+        by.setdefault(n, []).append(i)
+    for n, idxs in by.items():
+        g = glyf[n]
+        pts, flags, ends = list(g.coordinates), list(g.flags), list(g.endPtsOfContours)
+        for i in sorted(idxs, reverse=True):
+            c = next(k for k, e in enumerate(ends) if i <= e)
+            s, e = (ends[c - 1] + 1 if c else 0), ends[c]
+            pi, qi = (i - 1 if i > s else e), (i + 1 if i < e else s)
+            p, q, v = pts[pi], pts[qi], pts[i]
+            p_curve, q_curve = not flags[pi] & 1, not flags[qi] & 1
+
+            def toward(t, r):
+                d = math.dist(t, v) or 1
+                return (round(v[0] + (t[0] - v[0]) * r / d), round(v[1] + (t[1] - v[1]) * r / d))
+            if p_curve and q_curve:      # two curves meet: let them flow into each other
+                flags[i] = 0
+                continue
+            if p_curve or q_curve:       # a curve meets a straight stem: blend it in wide
+                line = q if p_curve else p
+                b = toward(line, min(BLEND, .5 * math.dist(line, v)))
+                new, fl = ([v, b], [0, 1]) if p_curve else ([b, v], [1, 0])
+            else:                        # two straight lines: small round corner
+                r = min(FILLET, .45 * math.dist(p, v), .45 * math.dist(q, v))
+                new, fl = [toward(p, r), v, toward(q, r)], [1, 0, 1]
+            pts[i:i + 1] = new
+            flags[i:i + 1] = fl
+            ends = ends[:c] + [x + len(new) - 1 for x in ends[c:]]
+        g.coordinates = GlyphCoordinates(pts)
+        g.flags = bytearray(flags)
+        g.flags[0] |= flagOverlapSimple
+        g.endPtsOfContours = ends
+
+
 # ------------------------------------------------- decompose, air, wobble
 def decompose_all(font):
     """Flatten composites so accented letters can tilt as one piece."""
@@ -426,7 +526,7 @@ def prepared(wght, tail=1):
     return font
 
 
-def make_master(loc, dots):
+def make_master(loc, dots, corners=None):
     v = {t: a[2] for t, a in AXES.items()} | loc
     font = prepared(v["wght"], v["TAIL"])
     if v["XHGT"] != XH:
@@ -434,6 +534,9 @@ def make_master(loc, dots):
     add_sparkle_feature(font, dots)
     decompose_all(font)
     add_air(font)
+    if corners is None:          # first pass: only used to find the corners
+        return font
+    round_corners(font, corners)
     if v["WOBL"]:
         wobble(font)
     glyf = font["glyf"]
@@ -475,6 +578,7 @@ def main():
     OUT.mkdir(exist_ok=True)
     src = TTFont(SRC)
     dots = find_dots(prepared(400))
+    corners = find_corners(make_master({}, dots))
 
     ds = DesignSpaceDocument()
     to_design = dict(wght_map(src))
@@ -490,12 +594,12 @@ def main():
     for tag, (_, lo, df, hi) in AXES.items():
         if tag == "wght":
             continue
-        for ext in (lo, hi):
+        for ext in (TAIL_STEPS if tag == "TAIL" else (lo, hi)):
             if ext != df:
                 locs += [{"wght": w, tag: ext} for w in MASTER_WEIGHTS]
     for i, loc in enumerate(locs):
         path = BUILD / f"master-{i:02d}.ttf"
-        make_master(loc, dots).save(path)
+        make_master(loc, dots, corners).save(path)
         s = SourceDescriptor()
         s.path = str(path)
         s.location = {AXES[t][0]: (to_design[val] if t == "wght" else val) for t, val in loc.items()}
@@ -527,7 +631,7 @@ def main():
     vf.save(out)
     vf.flavor = "woff2"
     vf.save(out.with_suffix(".woff2"))
-    print(f"{out.name}: axes {', '.join(AXES)}, {len(dots)} dotted glyphs, {len(vf.getGlyphOrder())} glyphs")
+    print(f"{out.name}: axes {', '.join(AXES)}, {len(corners)} corners rounded, {len(vf.getGlyphOrder())} glyphs")
 
 
 if __name__ == "__main__":

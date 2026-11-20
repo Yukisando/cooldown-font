@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Cooldown lab</title>
 <style>
-  @font-face { font-family: "Cooldown"; src: url("fonts/Cooldown-Lab.woff2?v=1.2") format("woff2");
+  @font-face { font-family: "Cooldown"; src: url("fonts/Cooldown-Lab.woff2?v=1.3b") format("woff2");
                font-weight: 300 700; font-display: block; }
   @font-face { font-family: "Comfortaa Ref"; src: url("src/Comfortaa-VariableFont_wght.ttf");
                font-weight: 300 700; }
@@ -114,12 +114,12 @@
   const AXES = [
     ["wght", "Weight", 300, 400, 700, 1, "Thin to bold, same as Comfortaa."],
     ["XHGT", "x-height", 520, 547, 600, 1, "Taller or shorter lowercase. Caps and tall letters stay put. 547 = Comfortaa."],
-    ["TAIL", "Queue d / q", 0, 1, 1, 0.01, "0 = Comfortaa, d and q mirror b and p. 1 = full foot like the l, best for dyslexic readers."],
+    ["TAIL", "Queue d / q", 0, 0, 1, 0.01, "0 = Comfortaa (default). Turn it up and a rounded foot grows out of d and q, like the l: easier for dyslexic readers."],
     ["WOBL", "Wobble", 0, 0, 1, 0.01, "Every letter tilts its own way, up to 10°, for a goofy hand-made feel. 0 = straight."],
   ];
   const PRESETS = {
     comfortaa: { wght: 400, XHGT: 547, TAIL: 0, WOBL: 0 },
-    default:   { wght: 400, XHGT: 547, TAIL: 1, WOBL: 0 },
+    default:   { wght: 400, XHGT: 547, TAIL: 0, WOBL: 0 },
     reading:   { wght: 400, XHGT: 575, TAIL: 1, WOBL: 0 },
     title:     { wght: 700, XHGT: 560, TAIL: 1, WOBL: 0.6 },
   };
