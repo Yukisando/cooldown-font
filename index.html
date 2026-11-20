@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Cooldown lab</title>
 <style>
-  @font-face { font-family: "Cooldown"; src: url("fonts/Cooldown-Lab.woff2?v=1.3c") format("woff2");
+  @font-face { font-family: "Cooldown"; src: url("fonts/Cooldown-Lab.woff2?v=1.6") format("woff2");
                font-weight: 300 700; font-display: block; }
   @font-face { font-family: "Comfortaa Ref"; src: url("src/Comfortaa-VariableFont_wght.ttf");
                font-weight: 300 700; }
@@ -71,6 +71,7 @@
       <input id="size" type="range" min="12" max="56" value="24"></div>
 
     <div class="toggles">
+      <label><input type="checkbox" id="tail"> Tail on d and q (ss03)</label>
       <label><input type="checkbox" id="spark"> Sparkle dots (ss02)</label>
       <label><input type="checkbox" id="compare"> Show Comfortaa underneath</label>
       <label><input type="checkbox" id="dark"> Dark background</label>
@@ -114,14 +115,13 @@
   const AXES = [
     ["wght", "Weight", 300, 400, 700, 1, "Thin to bold, same as Comfortaa."],
     ["XHGT", "x-height", 520, 547, 600, 1, "Taller or shorter lowercase. Caps and tall letters stay put. 547 = Comfortaa."],
-    ["TAIL", "Queue d / q", 0, 0, 1, 0.01, "0 = Comfortaa (default). Turn it up and a rounded foot grows out of d and q, like the l: easier for dyslexic readers."],
     ["WOBL", "Wobble", 0, 0, 1, 0.01, "Every letter tilts its own way, up to 10°, for a goofy hand-made feel. 0 = straight."],
   ];
   const PRESETS = {
-    comfortaa: { wght: 400, XHGT: 547, TAIL: 0, WOBL: 0 },
-    default:   { wght: 400, XHGT: 547, TAIL: 0, WOBL: 0 },
-    reading:   { wght: 400, XHGT: 575, TAIL: 1, WOBL: 0 },
-    title:     { wght: 700, XHGT: 560, TAIL: 1, WOBL: 0.6 },
+    comfortaa: { wght: 400, XHGT: 547, WOBL: 0 },
+    default:   { wght: 400, XHGT: 547, WOBL: 0 },
+    reading:   { wght: 400, XHGT: 575, WOBL: 0 },
+    title:     { wght: 700, XHGT: 560, WOBL: 0.6 },
   };
   const val = {}, box = document.getElementById("axes");
   for (const [tag, name, lo, df, hi, step, help] of AXES) {
@@ -144,9 +144,10 @@
   }
   document.querySelectorAll(".presets button").forEach(b => b.addEventListener("click", () => setAll(PRESETS[b.dataset.p])));
 
-  const size = document.getElementById("size"), spark = document.getElementById("spark");
+  const size = document.getElementById("size"), spark = document.getElementById("spark"), tail = document.getElementById("tail");
   size.addEventListener("input", apply);
   spark.addEventListener("change", apply);
+  tail.addEventListener("change", apply);
   document.getElementById("compare").addEventListener("change", e => document.body.classList.toggle("compare", e.target.checked));
   document.getElementById("dark").addEventListener("change", e =>
     document.documentElement.dataset.theme = e.target.checked ? "dark" : "light");
@@ -157,14 +158,15 @@
 
   function apply() {
     const fvs = AXES.map(([t]) => `"${t}" ${val[t]}`).join(", ");
-    const ffs = spark.checked ? '"ss02" 1' : "normal";
+    const feats = [spark.checked && '"ss02" 1', tail.checked && '"ss03" 1'].filter(Boolean);
+    const ffs = feats.length ? feats.join(", ") : "normal";
     document.querySelectorAll(".cd").forEach(el => { el.style.fontVariationSettings = fvs; el.style.fontFeatureSettings = ffs; });
     document.querySelectorAll(".ref").forEach(el => el.style.fontVariationSettings = `"wght" ${val.wght}`);
     for (const [t] of AXES) document.getElementById("o-" + t).textContent = val[t];
     document.documentElement.style.setProperty("--size", size.value + "px");
     document.getElementById("sizeo").textContent = size.value + "px";
     document.getElementById("css").textContent =
-      `font-family: "Cooldown";\nfont-variation-settings: ${fvs};` + (spark.checked ? `\nfont-feature-settings: "ss02" 1;` : "");
+      `font-family: "Cooldown";\nfont-variation-settings: ${fvs};` + (feats.length ? `\nfont-feature-settings: ${ffs};` : "");
   }
   apply();
 </script>

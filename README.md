@@ -11,13 +11,12 @@ Comfortaa's round, friendly shapes, and fixes the parts that make readers stumbl
 
 - **More room.** Every letter gets 15 more units on each side (3% of the em) and
   the space gets 40 more, so words don't blur together.
-- **No mirror letters.** In Comfortaa, `d` and `q` are exact mirrors of `b` and
-  `p`. Here they end in the same curved foot as Comfortaa's own `l` (the Tail
-  axis dials it from 0 to full), so each letter has a shape of its own.
+- **No mirror letters (optional).** In Comfortaa, `d` and `q` are exact mirrors
+  of `b` and `p`. Switch on `ss03` (`font-feature-settings: "ss03" 1`) and they
+  end in a rounded foot like Comfortaa's own `l`. Off by default.
 - **Sparkles.** Stylistic set `ss02` (on/off, `font-feature-settings: "ss02" 1`):
   the dots on i, j, ! ? . : ; and the accents become four-point ice sparkles.
 - **Axes.** Weight 300–700, x-height `XHGT` 520–600 (547 = Comfortaa),
-  Tail `TAIL` 0–1 (0 = Comfortaa's d/q, the default; turned up, a rounded foot grows and curls out of d and q) and
   Wobble `WOBL` 0–1 (each letter tilts its own way, up to 10°, for a goofy look).
   Spacing is fixed at +15 per side; tracking is a CSS job.
 - **❄** A snowflake glyph on U+2744, U+2745 and U+2746 that follows the weight.

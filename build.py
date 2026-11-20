@@ -9,11 +9,11 @@ Fixed changes on top of Comfortaa:
   - more letter and word spacing (easier for dyslexic readers)
   - a snowflake glyph on U+2744 / U+2745 / U+2746
   - ss02: i/j tittles and punctuation dots become ice sparkles (on/off)
+  - ss03: d and q end in a rounded foot like the l (on/off, off by default)
 
 Axes:
   wght  300-700  weight (Comfortaa's own)
   XHGT  520-600  x-height in units (Comfortaa: 547)
-  TAIL  0-1      d and q foot: 0 = Comfortaa (default), 1 = full foot like l
   WOBL  0-1      goofy: every letter tilts its own way, up to WOBBLE_DEG degrees
 Rename the font by changing FAMILY below.
 """
@@ -37,7 +37,7 @@ from fontTools.varLib import instancer
 from fontTools.varLib.featureVars import addFeatureVariations
 
 FAMILY = "Cooldown"
-VERSION = 1.3
+VERSION = 1.6
 DESIGNER = "Nathan de Castro (ColdSnap)"
 VENDOR = "CSNP"
 OUT_NAME = "Cooldown-Lab"
@@ -50,7 +50,6 @@ WOBBLE_DEG = 10          # max tilt per letter at WOBL 1
 FILLET = 35              # radius of the round where two straight edges meet
 BLEND = 50               # how far up a stem a curve melts into it
 CORNER_DEG = 35          # a turn sharper than this counts as a corner
-TAIL_STEPS = [0.25, 0.5, 0.75, 1]   # extra masters so the foot grows along its curve
 XH = 547                 # Comfortaa's x-height
 ASC = 781
 
@@ -58,7 +57,6 @@ ASC = 781
 AXES = {
     "wght": ("Weight", 300, 400, 700),
     "XHGT": ("x-height", 520, XH, 600),
-    "TAIL": ("Tail", 0, 0, 1),
     "WOBL": ("Wobble", 0, 0, 1),
 }
 MASTER_WEIGHTS = [300, 400, 700]
@@ -353,6 +351,11 @@ def add_sparkle_feature(font, dots):
             gdef[n + ".ss02"] = gdef[n]
         mapping[n] = n + ".ss02"
 
+    add_feature(font, "ss02", mapping)
+
+
+def add_feature(font, tag, mapping):
+    """Add a single-substitution feature (e.g. a stylistic set) to every script."""
     gsub = font["GSUB"].table
     lookup = ot.Lookup()
     lookup.LookupType, lookup.LookupFlag = 1, 0
@@ -362,7 +365,7 @@ def add_sparkle_feature(font, dots):
     gsub.LookupList.Lookup.append(lookup)
     gsub.LookupList.LookupCount = len(gsub.LookupList.Lookup)
     rec = ot.FeatureRecord()
-    rec.FeatureTag = "ss02"
+    rec.FeatureTag = tag
     rec.Feature = ot.Feature()
     rec.Feature.FeatureParams = None
     rec.Feature.LookupListIndex = [gsub.LookupList.LookupCount - 1]
@@ -378,6 +381,20 @@ def add_sparkle_feature(font, dots):
 
 
 # ---------------------------------------------------------------- fillets
+def inside(pt, poly, tol=4):
+    """True if pt is inside a contour (its points as a polygon) or on its edge."""
+    x, y, hit = pt[0], pt[1], False
+    for (x1, y1), (x2, y2) in zip(poly, poly[1:] + poly[:1]):
+        dx, dy = x2 - x1, y2 - y1
+        t = max(0, min(1, ((x - x1) * dx + (y - y1) * dy) / ((dx * dx + dy * dy) or 1)))
+        if math.dist(pt, (x1 + t * dx, y1 + t * dy)) <= tol:
+            return True
+    for (x1, y1), (x2, y2) in zip(poly, poly[1:] + poly[:1]):
+        if (y1 > y) != (y2 > y) and x < x1 + (y - y1) * (x2 - x1) / (y2 - y1):
+            hit = not hit
+    return hit
+
+
 def find_corners(font):
     """(glyph, point index) of every on-curve point where the outline turns sharply."""
     glyf, out = font["glyf"], []
@@ -397,15 +414,18 @@ def find_corners(font):
                 a2 = math.atan2(q[1] - v[1], q[0] - v[0])
                 turn = abs((math.degrees(a2 - a1) + 180) % 360 - 180)
                 if turn > CORNER_DEG and math.dist(p, v) > 2 and math.dist(q, v) > 2:
-                    out.append((n, i))
+                    hidden = any(inside(v, pts[s2:e2 + 1]) for s2, e2 in ranges(g) if s2 != s)
+                    if not hidden:   # a corner under another piece of the letter stays as is
+                        cross = (v[0] - p[0]) * (q[1] - v[1]) - (v[1] - p[1]) * (q[0] - v[0])
+                        out.append((n, i, cross < 0))
     return out
 
 
 def round_corners(font, corners):
     """Swap each corner point for a small curve (on, off, on): no spikes, no sharp notches."""
     glyf, by = font["glyf"], {}
-    for n, i in corners:
-        by.setdefault(n, []).append(i)
+    for n, i, tip in corners:
+        by.setdefault(n, {})[i] = tip
     for n, idxs in by.items():
         g = glyf[n]
         pts, flags, ends = list(g.coordinates), list(g.flags), list(g.endPtsOfContours)
@@ -419,14 +439,17 @@ def round_corners(font, corners):
             def toward(t, r):
                 d = math.dist(t, v) or 1
                 return (round(v[0] + (t[0] - v[0]) * r / d), round(v[1] + (t[1] - v[1]) * r / d))
-            if p_curve and q_curve:      # two curves meet: let them flow into each other
+            if idxs[i]:                  # outward tip: small round, never cut into the stroke
+                r = min(FILLET, .45 * math.dist(p, v), .45 * math.dist(q, v))
+                new, fl = [toward(p, r), v, toward(q, r)], [1, 0, 1]
+            elif p_curve and q_curve:    # two curves meet in a notch: let them flow together
                 flags[i] = 0
                 continue
-            if p_curve or q_curve:       # a curve meets a straight stem: blend it in wide
+            elif p_curve or q_curve:     # a curve meets a straight stem: blend it in wide
                 line = q if p_curve else p
                 b = toward(line, min(BLEND, .5 * math.dist(line, v)))
                 new, fl = ([v, b], [0, 1]) if p_curve else ([b, v], [1, 0])
-            else:                        # two straight lines: small round corner
+            else:                        # two straight lines in a notch: small round
                 r = min(FILLET, .45 * math.dist(p, v), .45 * math.dist(q, v))
                 new, fl = [toward(p, r), v, toward(q, r)], [1, 0, 1]
             pts[i:i + 1] = new
@@ -479,7 +502,7 @@ def wobble(font):
         g = glyf[n]
         if g.numberOfContours <= 0:
             continue
-        h = zlib.crc32(n.removesuffix(".ss02").encode())
+        h = zlib.crc32(n.removesuffix(".ss02").removesuffix(".ss03").encode())
         mag = 0.35 + 0.65 * ((h & 0xFFFF) / 0xFFFF)
         deg = WOBBLE_DEG * mag * (1 if h & 0x10000 else -1)
         a = math.radians(deg)
@@ -511,7 +534,31 @@ def source_without_featvars():
     return font, swaps
 
 
-def prepared(wght, tail=1):
+def add_tail_alternates(font):
+    """d.ss03 / q.ss03 (and dcaron, dcroat...) with the rounded foot; plain d / q stay Comfortaa."""
+    glyf, hmtx = font["glyf"], font["hmtx"]
+    mapping = {}
+    for base, zone, drop in (("d", lambda y: y > 600, False), ("q", lambda y: y < -100, True)):
+        alt = base + ".ss03"
+        add_glyph(font, alt, copy.deepcopy(glyf[base]), hmtx[base])
+        add_foot(font, alt, zone, drop=drop, tail=1)
+        mapping[base] = alt
+        for n in list(font.getGlyphOrder()):
+            g = glyf[n]
+            if g.isComposite() and g.components[0].glyphName == base and not n.endswith(".ss03"):
+                new = copy.deepcopy(g)
+                new.components[0].glyphName = alt
+                delta = hmtx[alt][0] - hmtx[base][0]
+                add_glyph(font, n + ".ss03", new, (hmtx[n][0] + delta, hmtx[n][1]))
+                mapping[n] = n + ".ss03"
+    gdef = font["GDEF"].table.GlyphClassDef.classDefs if "GDEF" in font else {}
+    for n, alt in mapping.items():
+        if n in gdef:
+            gdef[alt] = gdef[n]
+    add_feature(font, "ss03", mapping)
+
+
+def prepared(wght):
     font = instancer.instantiateVariableFont(source_without_featvars()[0], {"wght": wght})
     for tag in ("prep", "fpgm", "cvt "):
         if tag in font:
@@ -520,15 +567,14 @@ def prepared(wght, tail=1):
         if hasattr(g, "program"):
             g.program = ttProgram.Program()
             g.program.fromBytecode(b"")
-    add_foot(font, "d", lambda y: y > 600, drop=False, tail=tail)
-    add_foot(font, "q", lambda y: y < -100, drop=True, tail=tail)
+    add_tail_alternates(font)
     add_snowflake(font)
     return font
 
 
 def make_master(loc, dots, corners=None):
     v = {t: a[2] for t, a in AXES.items()} | loc
-    font = prepared(v["wght"], v["TAIL"])
+    font = prepared(v["wght"])
     if v["XHGT"] != XH:
         raise_xheight(font, v["XHGT"] - XH)
     add_sparkle_feature(font, dots)
@@ -594,7 +640,7 @@ def main():
     for tag, (_, lo, df, hi) in AXES.items():
         if tag == "wght":
             continue
-        for ext in (TAIL_STEPS if tag == "TAIL" else (lo, hi)):
+        for ext in (lo, hi):
             if ext != df:
                 locs += [{"wght": w, tag: ext} for w in MASTER_WEIGHTS]
     for i, loc in enumerate(locs):
