@@ -44,8 +44,8 @@ OUT_NAME = "Cooldown-Lab"
 
 SPACING = 6              # extra units on each side of every glyph (UPM 1000)
 WORD_SPACING = 20        # extra units on the space on top of that
-FLAKE_REACH = 1.6        # snowflake arm length, in dot radii (ss02)
-FLAKE_STROKE = 0.42      # snowflake stroke width, in dot radii
+FLAKE_REACH = 1.35       # snowflake arm length, in dot radii (ss02)
+FLAKE_STROKE = 0.5       # snowflake stroke width, in dot radii
 WOBBLE_DEG = 10          # max tilt per letter at WOBL 1
 FILLET = 35              # radius of the round where two straight edges meet
 BLEND = 50               # how far up a stem a curve melts into it
@@ -308,7 +308,7 @@ def find_dots(font):
 
 def flake(g, idxs):
     """Swap the round dot contours `idxs` of glyph g for little six-armed snowflakes,
-    the same size as the dot (arms and branches are round-capped strokes)."""
+    about the size of the dot."""
     pts, flags = list(g.coordinates), list(g.flags)
     spans = list(ranges(g))
     centres = []
@@ -327,14 +327,12 @@ def flake(g, idxs):
     g.endPtsOfContours = ends
     g.numberOfContours = len(ends)
     for cx, cy, r in centres:
+        # Three round-capped strokes crossing at the centre: six arms, light on file size.
         arm, w = r * FLAKE_REACH, max(14, r * FLAKE_STROKE)
-        for k in range(6):
+        for k in range(3):
             a = math.radians(90 + 60 * k)
-            append_contour(g, *capsule((cx, cy), (cx + arm * math.cos(a), cy + arm * math.sin(a)), w))
-            bx, by = cx + arm * .55 * math.cos(a), cy + arm * .55 * math.sin(a)
-            for side in (-1, 1):
-                t = a + side * math.radians(50)
-                append_contour(g, *capsule((bx, by), (bx + arm * .38 * math.cos(t), by + arm * .38 * math.sin(t)), w))
+            dx, dy = arm * math.cos(a), arm * math.sin(a)
+            append_contour(g, *capsule((cx - dx, cy - dy), (cx + dx, cy + dy), w))
 
 
 def add_flake_feature(font, dots):
