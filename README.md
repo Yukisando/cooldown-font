@@ -1,4 +1,4 @@
-# Snap Sans (working name)
+# Cooldown
 
 ColdSnap's own typeface. A variable font built on Comfortaa, made easier to read
 for kids and dyslexic readers, with a little frost on top.
@@ -25,8 +25,8 @@ Comfortaa's round, friendly shapes, and fixes the parts that make readers stumbl
 
 | File | What |
 |---|---|
-| `fonts/SnapSans[wght,FRST].woff2` | For websites |
-| `fonts/SnapSans[wght,FRST].ttf` | To install on Windows / Mac |
+| `fonts/Cooldown[wght,FRST].woff2` | For websites |
+| `fonts/Cooldown[wght,FRST].ttf` | To install on Windows / Mac |
 | `index.html` | Specimen with Weight / Frost / Size sliders (serve the folder, e.g. `python -m http.server`) |
 | `build.py` | Rebuilds everything from `src/` |
 
@@ -34,12 +34,12 @@ Comfortaa's round, friendly shapes, and fixes the parts that make readers stumbl
 
 ```css
 @font-face {
-  font-family: "Snap Sans";
-  src: url("SnapSans[wght,FRST].woff2") format("woff2");
+  font-family: "Cooldown";
+  src: url("Cooldown[wght,FRST].woff2") format("woff2");
   font-weight: 300 700;
   font-display: swap;
 }
-body  { font-family: "Snap Sans", sans-serif; }
+body  { font-family: "Cooldown", sans-serif; }
 h1    { font-variation-settings: "FRST" 100; }
 ```
 
