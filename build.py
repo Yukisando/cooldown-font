@@ -13,7 +13,7 @@ Fixed changes on top of Comfortaa:
 
 Axes:
   wght  300-700  weight (Comfortaa's own)
-  XHGT  520-600  x-height in units (Comfortaa: 547)
+  XHGT  470-600  x-height in units (Comfortaa: 547)
   WOBL  0-1      goofy: every letter tilts its own way, up to WOBBLE_DEG degrees
 Rename the font by changing FAMILY below.
 """
@@ -37,13 +37,13 @@ from fontTools.varLib import instancer
 from fontTools.varLib.featureVars import addFeatureVariations
 
 FAMILY = "Cooldown"
-VERSION = 1.6
+VERSION = 1.7
 DESIGNER = "Nathan de Castro (ColdSnap)"
 VENDOR = "CSNP"
 OUT_NAME = "Cooldown-Lab"
 
-SPACING = 15             # extra units on each side of every glyph (UPM 1000)
-WORD_SPACING = 40        # extra units on the space on top of that
+SPACING = 6              # extra units on each side of every glyph (UPM 1000)
+WORD_SPACING = 20        # extra units on the space on top of that
 SPARKLE_N = 0.65         # superellipse exponent: 1 = diamond, < 1 = concave star
 SPARKLE_K = 1.45         # how far the sparkle points reach, in dot radii
 WOBBLE_DEG = 10          # max tilt per letter at WOBL 1
@@ -56,7 +56,7 @@ ASC = 781
 # tag: (name, min, default, max)
 AXES = {
     "wght": ("Weight", 300, 400, 700),
-    "XHGT": ("x-height", 520, XH, 600),
+    "XHGT": ("x-height", 470, XH, 600),
     "WOBL": ("Wobble", 0, 0, 1),
 }
 MASTER_WEIGHTS = [300, 400, 700]
